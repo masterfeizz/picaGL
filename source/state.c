@@ -6,7 +6,6 @@ picaGLState *pglState;
 
 void pglState_init()
 {
-	//pglState->vertexCache = sequential_buffer_create(0x280000);
 	pglState->geometryBuffer = linearAlloc(GEOMETRY_BUFFER_SIZE);
 
 	pglState->colorBuffer = vramAlloc(400 * 240 * 4);
@@ -14,8 +13,6 @@ void pglState_init()
 
 	pglState->commandBuffer = linearAlloc(COMMAND_BUFFER_SIZE);
 	GPUCMD_SetBuffer(pglState->commandBuffer, COMMAND_BUFFER_LENGTH, 0);
-
-	pglState->textures = malloc(sizeof(TextureObject) * MAX_TEXTURES);
 
 	pglState->basicShader_dvlb = DVLB_ParseFile((u32*)vshader_shbin, vshader_shbin_size);
 
@@ -63,8 +60,10 @@ void pglState_default()
 	pglState->writeMask = GPU_WRITE_ALL;
 
 	glActiveTexture(1);
+	glBindTexture(GL_TEXTURE_2D, 0);
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	glActiveTexture(0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
@@ -129,20 +128,20 @@ void pglState_flush()
 	{
 		uint16_t texunit_enable_mask = 0;
 
-		if(pglState->texUnitState[0] && pglState->textures[pglState->textureBound[0]].data)
+		if(pglState->texUnitState[0] && pglState->textureBound[0]->data)
 		{
 			texunit_enable_mask |= 0x01;
 			_picaTextureEnvSet(0, &pglState->texenv[0]);
-			_picaTextureObjectSet(GPU_TEXUNIT0, &pglState->textures[pglState->textureBound[0]]);
+			_picaTextureObjectSet(GPU_TEXUNIT0, pglState->textureBound[0]);
 		}
 		else
 			_picaTextureEnvSet(0, &pglState->texenv[PGL_TEXENV_UNTEXTURED]);
 
-		if(pglState->texUnitState[1] && pglState->textures[pglState->textureBound[1]].data)
+		if(pglState->texUnitState[1] && pglState->textureBound[1]->data)
 		{
 			texunit_enable_mask |= 0x02;
 			_picaTextureEnvSet(1, &pglState->texenv[1]);
-			_picaTextureObjectSet(GPU_TEXUNIT1, &pglState->textures[pglState->textureBound[1]]);
+			_picaTextureObjectSet(GPU_TEXUNIT1, pglState->textureBound[1]);
 		}
 		else
 			_picaTextureEnvSet(1, &pglState->texenv[PGL_TEXENV_DUMMY]);

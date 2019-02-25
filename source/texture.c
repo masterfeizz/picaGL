@@ -209,7 +209,7 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
 	if(level != 0 || target != GL_TEXTURE_2D)
 		return;
 
-	TextureObject *texture = &pglState->textures[pglState->textureBound[pglState->texUnitActive]];
+	TextureObject *texture = pglState->textureBound[pglState->texUnitActive];
 	texture->used = true;
 
 	if(texture->data)
@@ -236,7 +236,7 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
 
 void glTexParameterf(GLenum target, GLenum pname, GLfloat param)
 {
-	TextureObject *texture = &pglState->textures[pglState->textureBound[pglState->texUnitActive]];
+	TextureObject *texture = pglState->textureBound[pglState->texUnitActive];
 
 	uint32_t tex_param = texture->param;
 
@@ -271,13 +271,28 @@ void glTexParameteri(GLenum target, GLenum pname, GLint param)
 
 void glBindTexture(GLenum target, GLuint texture)
 {
-	if(pglState->textureBound[pglState->texUnitActive] == texture)
+	TextureObject *texObject;
+
+	texObject = hashTableGet(&pglState->textureTable, texture);
+
+	if(texObject == NULL)
+	{
+		texObject = malloc(sizeof(TextureObject));
+
+		texObject->param  = GPU_TEXTURE_MAG_FILTER(GPU_LINEAR) | GPU_TEXTURE_WRAP_S(GPU_REPEAT) | GPU_TEXTURE_WRAP_T(GPU_REPEAT);
+		texObject->width  = 0;
+		texObject->height = 0;
+
+		texObject->format = 0;
+		texObject->data   = NULL;
+		
+		hashTableInsert(&pglState->textureTable, texture, texObject);
+	}
+
+	if(pglState->textureBound[pglState->texUnitActive] == texObject)
 		return;
 
-	if(texture > MAX_TEXTURES)
-		return;
-
-	pglState->textureBound[pglState->texUnitActive] = texture;
+	pglState->textureBound[pglState->texUnitActive] = texObject;
 
 	pglState->textureChanged = GL_TRUE;
 	pglState->changes |= STATE_TEXTURE_CHANGE;
@@ -285,25 +300,23 @@ void glBindTexture(GLenum target, GLuint texture)
 
 void glGenTextures(GLsizei n, GLuint *textures)
 {
-	static int tex_id = 1;
-
+	TextureObject *texObject;
+	int id;
 	for(int i = 0; i < n; i++)
 	{
-		if(tex_id >= MAX_TEXTURES)
-			tex_id = 1;
+		id = hashTableUniqueKey(&pglState->textureTable);
+		texObject = malloc(sizeof(TextureObject));
 
-		while(pglState->textures[tex_id].used)
-			tex_id++;
+		texObject->param  = GPU_TEXTURE_MAG_FILTER(GPU_LINEAR) | GPU_TEXTURE_WRAP_S(GPU_REPEAT) | GPU_TEXTURE_WRAP_T(GPU_REPEAT);
+		texObject->width  = 0;
+		texObject->height = 0;
 
-		pglState->textures[tex_id].used = true;
-		pglState->textures[tex_id].param  = GPU_TEXTURE_MAG_FILTER(GPU_LINEAR) | GPU_TEXTURE_WRAP_S(GPU_REPEAT) | GPU_TEXTURE_WRAP_T(GPU_REPEAT);
-		pglState->textures[tex_id].width  = 0;
-		pglState->textures[tex_id].height = 0;
+		texObject->format = 0;
+		texObject->data   = NULL;
 
-		pglState->textures[tex_id].format = 0;
-		pglState->textures[tex_id].data   = NULL;
+		hashTableInsert(&pglState->textureTable, id, texObject);
 
-		textures[i] = tex_id;
+		textures[i] = id;
 	}
 }
 
@@ -311,12 +324,15 @@ void glDeleteTextures(GLsizei n, const GLuint *textures)
 {
 	for(int i = 0; i < n; i++)
 	{
-		TextureObject *texture = &pglState->textures[textures[i]];
+		TextureObject *texObject = hashTableRemove(&pglState->textureTable, textures[i]);
 
-		if(texture->data)
-			_textureDataFree(texture);
+		if(!texObject)
+			continue;
 
-		texture->used = false;
+		if(texObject->data)
+			_textureDataFree(texObject);
+
+		free(texObject);
 	}
 }
 
@@ -332,7 +348,7 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
 		return;
 	}
 
-	TextureObject *texture = &pglState->textures[pglState->textureBound[pglState->texUnitActive]];
+	TextureObject *texture = pglState->textureBound[pglState->texUnitActive];
 
 	if(texture->data == NULL)
 		return;
@@ -388,9 +404,17 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
 	pglState->changes |= STATE_TEXTURE_CHANGE;
 }
 
-GLboolean glIsTexture( GLenum obj ) 
+GLboolean glIsTexture( GLuint texture ) 
 { 
-	return obj >= 0 && obj < MAX_TEXTURES; 
+	if(texture == 0)
+		return GL_FALSE;
+
+	TextureObject *texObject = hashTableGet(&pglState->textureTable, texture);
+
+	if(texObject)
+		return GL_TRUE;
+
+	return GL_FALSE;
 }
 
 void glTexImage1D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLint border, GLenum format, GLenum type, const GLvoid *pixels)

@@ -7,9 +7,9 @@
 #include <GL/picaGL.h>
 
 #include "utils/math_utils.h"
+#include "utils/hashtable.h"
 
 #define MATRIX_STACK_SIZE 16
-#define MAX_TEXTURES      5900
 
 #define GEOMETRY_BUFFER_SIZE 0x280000
 
@@ -130,8 +130,9 @@ typedef struct {
 	GLuint				texUnitActive;
 	GLuint				texUnitActiveClient;
 
-	GLuint		 		textureBound[2];
-	TextureObject		*textures;
+	TextureObject 		*textureBound[2];
+	HashTable			textureTable;
+
 	GLboolean			textureChanged;
 
 	GLint				viewportX, viewportY;
