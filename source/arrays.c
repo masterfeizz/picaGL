@@ -275,6 +275,24 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count)
 
 void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices)
 {
+	if(type != GL_UNSIGNED_SHORT)
+		return;
+
+	uint32_t  vertex_count = 0;
+
+	for(int i = 0; i < count; i++)
+	{
+			if(vertex_count < ((GLushort*)indices)[i])
+				vertex_count = ((GLushort*)indices)[i];
+	}
+
+	vertex_count++;
+
+	glDrawRangeElements( mode, 0, vertex_count, count, type, indices );
+}
+
+void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices )
+{
 	uint8_t  buffer_count 			= 0;
 	uint16_t attributes_fixed_mask 	= 0xFFF;
 	uint64_t attributes_format 		= 0x00;
@@ -284,39 +302,20 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indic
 	AttribPointer *color_array 		= &pglState->colorArrayPointer;
 	AttribPointer *texcoord_array 	= pglState->texCoordArrayPointer;
 
-	uint32_t  vertex_count = 0;
-	uint16_t* index_array  = _cacheArray(NULL, sizeof(uint16_t) * count);
-
-	for(int i = 0; i < count; i++)
-	{
-		switch(type)
-		{
-			case GL_UNSIGNED_INT:
-				index_array[i] = ((GLuint*)indices)[i];
-
-				if(vertex_count < ((GLuint*)indices)[i])
-					vertex_count = ((GLuint*)indices)[i];
-				break;
-			case GL_UNSIGNED_SHORT:
-				index_array[i] = ((GLushort*)indices)[i];
-
-				if(vertex_count < ((GLushort*)indices)[i])
-					vertex_count = ((GLushort*)indices)[i];
-
-				break;
-		}
-	}
-
-	vertex_count++;
-
 	void *array_cache;
+
+	if(type != GL_UNSIGNED_SHORT)
+		return;
+
+	uint16_t* index_array  = _cacheArray(indices, sizeof(uint16_t) * count);
+
 
 	if(pglState->vertexArrayState == GL_FALSE)
 		return;
 
 	pglState_flush();
 
-	array_cache = _cacheArray(vertex_array->pointer, vertex_array->stride * vertex_count);
+	array_cache = _cacheArray(vertex_array->pointer, vertex_array->stride * end);
 
 	attributes_format |= GPU_ATTRIBFMT(0, vertex_array->size, vertex_array->type);
 	_picaAttribBufferOffset(buffer_count, (uint32_t)array_cache - __ctru_linear_heap);
@@ -333,7 +332,7 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indic
 	}
 	else
 	{
-		array_cache = _cacheArray(color_array->pointer, color_array->stride * vertex_count);
+		array_cache = _cacheArray(color_array->pointer, color_array->stride * end);
 
 		attributes_format |= GPU_ATTRIBFMT(1, color_array->size, color_array->type);
 		_picaAttribBufferOffset(buffer_count, (uint32_t)array_cache - __ctru_linear_heap);
@@ -351,7 +350,7 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indic
 	}
 	else
 	{
-		array_cache = _cacheArray(texcoord_array[0].pointer, texcoord_array[0].stride * vertex_count);
+		array_cache = _cacheArray(texcoord_array[0].pointer, texcoord_array[0].stride * end);
 
 		attributes_format |= GPU_ATTRIBFMT(2, texcoord_array[0].size, texcoord_array[0].type);
 		_picaAttribBufferOffset(buffer_count, (uint32_t)array_cache - __ctru_linear_heap);
@@ -369,7 +368,7 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indic
 	}
 	else
 	{
-		array_cache = _cacheArray(texcoord_array[1].pointer, texcoord_array[1].stride * vertex_count);
+		array_cache = _cacheArray(texcoord_array[1].pointer, texcoord_array[1].stride * end);
 
 		attributes_format |= GPU_ATTRIBFMT(3, texcoord_array[1].size, texcoord_array[1].type);
 		_picaAttribBufferOffset(buffer_count, (uint32_t)array_cache - __ctru_linear_heap);
@@ -399,9 +398,4 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indic
 	}
 	
 	_picaDrawElements(primitive_type, (uint32_t)index_array - __ctru_linear_heap, count);
-}
-
-void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices )
-{
-	glDrawElements(mode, count, type, indices);
 }
