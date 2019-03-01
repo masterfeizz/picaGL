@@ -119,7 +119,7 @@ void _picaDrawElements(GPU_Primitive_t primitive, uint32_t indexArray, uint32_t 
 
 void _picaDepthMap(float near, float far, float polygon_offset){
 	float scale  = near - far;
-	float offset = near - polygon_offset;
+	float offset = near + polygon_offset;
 
 	GPUCMD_AddWrite(GPUREG_DEPTHMAP_ENABLE, 0x00000001);
 	GPUCMD_AddWrite(GPUREG_DEPTHMAP_SCALE, f32tof24(scale));

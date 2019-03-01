@@ -22,7 +22,7 @@ void pglExit()
 
 void pglSwapBuffers()
 {
-	glFinish();
+	glFlush();
 
 	uint32_t *output_framebuffer = (uint32_t*)gfxGetFramebuffer(pglState->display, pglState->display_side, NULL, NULL);
 	uint8_t output_format = gfxGetScreenFormat(pglState->display);
@@ -42,7 +42,7 @@ void pglSwapBuffers()
 			GX_TRANSFER_OUT_FORMAT(output_format));
 	}
 	
-	gspWaitForPPF();
+	_queueRun(true);
 
 	gfxSwapBuffersGpu();
 }

@@ -130,8 +130,10 @@ static inline void _tileTexture(TextureObject *texture, GLsizei width, GLsizei h
 
 	if(texture->in_vram)
 	{
+		_queueWaitAndClear();
 		GX_TextureCopy(tiled_output, 0, texture->data, 0, texture->width * texture->height * _determineBPP(texture->format), 8);
-		gspWaitForPPF();
+		_queueRun(false);
+		
 		linearFree(tiled_output);
 	}
 }
@@ -343,11 +345,6 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
 		return;
 	}
 
-	if(format != GL_RGBA || type != GL_UNSIGNED_BYTE)
-	{
-		return;
-	}
-
 	TextureObject *texture = pglState->textureBound[pglState->texUnitActive];
 
 	if(texture->data == NULL)
@@ -362,11 +359,9 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
 		if(!tiled_output)
 			return;
 
-		if(width != texture->width || height != texture->height)
-		{
-			GX_TextureCopy(texture->data, 0, tiled_output, 0, texture->width * texture->height * _determineBPP(texture->format), 8);
-			gspWaitForPPF();
-		}
+		_queueWaitAndClear();
+		GX_TextureCopy(texture->data, 0, tiled_output, 0, texture->width * texture->height * _determineBPP(texture->format), 8);
+		_queueRun(false);
 
 		_textureDataFree(texture);
 

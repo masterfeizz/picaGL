@@ -73,6 +73,13 @@ void glCullFace(GLenum mode)
 
 void glFlush(void)
 {
+	static int nextCommandBuffer = 1;
+
+	if(pglState->batchedDraws == 0)
+		return;
+
+	_queueWaitAndClear();
+
 	u32* commandBuffer;
 	u32  commandBuffer_size;
 
@@ -83,15 +90,19 @@ void glFlush(void)
 	GX_FlushCacheRegions (commandBuffer, commandBuffer_size * 4, (u32 *) __ctru_linear_heap, __ctru_linear_heap_size, NULL, 0);
 	GX_ProcessCommandList(commandBuffer, commandBuffer_size * 4, 0x00);
 
-	gspWaitForP3D();
+	_queueRun(true);
 
-	GPUCMD_SetBuffer(pglState->commandBuffer, COMMAND_BUFFER_LENGTH, 0);
+	GPUCMD_SetBuffer(pglState->commandBuffer[nextCommandBuffer], COMMAND_BUFFER_LENGTH, 0);
+
+	pglState->batchedDraws = 0;
+
+	nextCommandBuffer = !nextCommandBuffer;
 }
 
 void glFinish(void)
 {
 	glFlush();
-	
+	_queueWaitAndClear();
 }
 
 void glViewport(GLint x, GLint y, GLsizei width, GLsizei height)

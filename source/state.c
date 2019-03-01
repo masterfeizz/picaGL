@@ -6,13 +6,21 @@ picaGLState *pglState;
 
 void pglState_init()
 {
+	pglState->gxQueue.maxEntries = 8;
+	pglState->gxQueue.entries = (gxCmdEntry_s*)malloc(pglState->gxQueue.maxEntries*sizeof(gxCmdEntry_s));
+
 	pglState->geometryBuffer = linearAlloc(GEOMETRY_BUFFER_SIZE);
 
 	pglState->colorBuffer = vramAlloc(400 * 240 * 4);
 	pglState->depthBuffer = vramAlloc(400 * 240 * 4);
 
-	pglState->commandBuffer = linearAlloc(COMMAND_BUFFER_SIZE);
-	GPUCMD_SetBuffer(pglState->commandBuffer, COMMAND_BUFFER_LENGTH, 0);
+	pglState->commandBuffer[0] = linearAlloc(COMMAND_BUFFER_SIZE);
+	pglState->commandBuffer[1] = linearAlloc(COMMAND_BUFFER_SIZE);
+
+	GPUCMD_SetBuffer(pglState->commandBuffer[0], COMMAND_BUFFER_LENGTH, 0);
+
+	GX_BindQueue(&pglState->gxQueue);
+	gxCmdQueueRun(&pglState->gxQueue);
 
 	pglState->basicShader_dvlb = DVLB_ParseFile((u32*)vshader_shbin, vshader_shbin_size);
 
@@ -28,6 +36,7 @@ void pglState_init()
 	_picaRenderBuffer(pglState->colorBuffer, pglState->depthBuffer);
 	
 	_picaAttribBuffersLocation((void*)__ctru_linear_heap);
+
 }
 
 void pglState_default()
@@ -48,6 +57,7 @@ void pglState_default()
 
 	glDisable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
+	glAlphaFunc(GL_ALWAYS, 0.0);
 
 	glDisable(GL_ALPHA_TEST);
 	glDisable(GL_STENCIL_TEST);
@@ -80,6 +90,9 @@ void pglState_flush()
 {
 	static matrix4x4 matrix_mvp;
 
+	if(!pglState->changes)
+		return;
+	
 	if(pglState->changes & STATE_VIEWPORT_CHANGE)
 	{
 		_picaViewport(pglState->viewportX, pglState->viewportY, pglState->viewportWidth, pglState->viewportHeight);

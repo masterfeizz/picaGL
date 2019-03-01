@@ -96,6 +96,9 @@ void glVertex3fv(const GLfloat* v)
 void glEnd(void)
 {
 	_picaImmediateEnd();
+	
+	if(++pglState->batchedDraws > MAX_BATCHED_DRAWS)
+		glFlush();
 }
 
 void glMultiTexCoord2f( GLenum target, GLfloat s, GLfloat t )

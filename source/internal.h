@@ -11,9 +11,11 @@
 
 #define MATRIX_STACK_SIZE 16
 
-#define GEOMETRY_BUFFER_SIZE 0x280000
+#define MAX_BATCHED_DRAWS 200
 
-#define COMMAND_BUFFER_LENGTH 0x140000
+#define GEOMETRY_BUFFER_SIZE 0x240000
+#define COMMAND_BUFFER_LENGTH 0x100000
+
 #define COMMAND_BUFFER_SIZE   COMMAND_BUFFER_LENGTH * 4
 
 #define STATE_RENDERTARGET_CHANGE 	(1 << 0)
@@ -69,7 +71,8 @@ typedef struct {
 } texcoord;
 
 typedef struct {
-	uint32_t			*commandBuffer, commandBufferLength;
+	gxCmdQueue_s 		gxQueue;
+	uint32_t			*commandBuffer[2], commandBufferLength;
 	uint32_t			*colorBuffer, *depthBuffer;
 
 	DVLB_s*				basicShader_dvlb;
@@ -155,6 +158,7 @@ typedef struct {
 	void 				*geometryBuffer;
 
 	GLuint				changes;
+	GLuint 				batchedDraws;
 } picaGLState;
 
 extern picaGLState *pglState;
@@ -195,5 +199,9 @@ void _picaImmediateEnd(void);
 void _picaLogicOp(GPU_LOGICOP op);
 void _picaDrawElements(GPU_Primitive_t primitive, uint32_t indexArray, uint32_t count);
 void _picaFixedAttribute(float x, float y, float z, float w);
+void _picaRestartPrimitive();
+
+void _queueWaitAndClear();
+void _queueRun(bool async);
 
 #endif
