@@ -110,15 +110,15 @@ static inline void _tileTexture(TextureObject *texture, GLsizei width, GLsizei h
 	{
 		for (int x = 0; x < width; x++)
 		{
-			offset = texture_swizzle_coord(x, y, texture->width);
-			texel = ((uint32_t*)data)[x + (height - 1 - y) * width];
+			offset = texture_swizzle_coord(x, (height - 1 - y), texture->width);
+			texel = ((uint32_t*)data)[x + (y * width)];
 
 			if(texture->format == GPU_RGBA4)
-				((u16 *)tiled_output)[offset] = rgba8_to_rgba4(texel);
+				((uint16_t *)tiled_output)[offset] = rgba8_to_rgba4(texel);
 			else if(texture->format == GPU_RGBA8)
-				((u32 *)tiled_output)[offset] = __builtin_bswap32(texel);
+				((uint32_t *)tiled_output)[offset] = __builtin_bswap32(texel);
 			else if(texture->format == GPU_RGB565)
-				((u16 *)tiled_output)[offset] = rgba8_to_rgb565(texel);
+				((uint16_t *)tiled_output)[offset] = rgba8_to_rgb565(texel);
 			else if(texture->format == GPU_L8)
 				((uint8_t*)tiled_output)[offset] = rgba8_to_l8(texel);
 			else if(texture->format == GPU_LA4)
@@ -340,7 +340,7 @@ void glDeleteTextures(GLsizei n, const GLuint *textures)
 
 void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid* data)
 {
-	if(format != GL_RGBA || type != GL_UNSIGNED_BYTE)
+	if((format != GL_RGBA) || (type != GL_UNSIGNED_BYTE))
 	{
 		return;
 	}
@@ -371,19 +371,17 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
 
 	uint32_t texel, offset;
 
-	for(int y = yoffset; y < height; y++)
+	for(int y = 0; y < height; y++)
 	{
-		for(int x = xoffset; x < width; x++)
+		for(int x = 0; x < width; x++)
 		{
+			offset = texture_swizzle_coord(x + xoffset, texture->height - 1 - (y + yoffset), texture->width);
+			texel = ((uint32_t*)data)[x + (y * width)];
 
-			offset = texture_swizzle_coord(xoffset + x, yoffset + y, texture->width);
-
-			texel = ((uint32_t*)data)[x + (height - 1 - y) * width];
-
-			if(texture->format == GPU_RGBA8)
-				((uint32_t *)tiled_output)[offset] = __builtin_bswap32(texel);
-			else if(texture->format == GPU_RGBA4)
+			if(texture->format == GPU_RGBA4)
 				((uint16_t *)tiled_output)[offset] = rgba8_to_rgba4(texel);
+			else if(texture->format == GPU_RGBA8)
+				((uint32_t *)tiled_output)[offset] = __builtin_bswap32(texel);
 			else if(texture->format == GPU_RGB565)
 				((uint16_t *)tiled_output)[offset] = rgba8_to_rgb565(texel);
 			else if(texture->format == GPU_L8)
