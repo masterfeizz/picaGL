@@ -376,6 +376,7 @@ void glClear( GLbitfield mask );
 void glColorMask( GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha );
 void glAlphaFunc( GLenum func, GLclampf ref );
 void glBlendFunc( GLenum sfactor, GLenum dfactor );
+void glBlendEquation(GLenum mode);
 void glCullFace( GLenum mode );
 void glFrontFace( GLenum mode );
 void glPolygonMode( GLenum face, GLenum mode );

@@ -8,19 +8,15 @@ static void _configAttribBuffer(uint8_t id, uint64_t format, uint8_t stride, uin
 
 	while(padding > 0)
 	{
-		if(padding < 4) 
-		{
+		if(padding < 4) {
 			format |= (0xB + padding) << (count * 4);
 			padding = 0;
-		}
-		else 
-		{
+		} else {
 			format |= 0xF << (count * 4);
 			padding -= 4;
 		}
 		count++;
 	}
-
 
 	param[0] = format & 0xFFFFFFFF;
 	param[1] = (count << 28) | ((stride & 0xFF) << 16) | ((format >> 32) & 0xFFFF);
@@ -28,24 +24,25 @@ static void _configAttribBuffer(uint8_t id, uint64_t format, uint8_t stride, uin
 	GPUCMD_AddIncrementalWrites(GPUREG_ATTRIBBUFFER0_CONFIG1 + (id * 0x03), param, 0x02);
 }
 
-static void* _cacheArray(const void *data, GLsizei size)
+//Check if we have enough space in the current geometry buffer
+static bool _checkBufferLimit(GLsizei size)
 {
-	static uint32_t offset = 0;
+	if(pglState->geometryBufferOffset + size > GEOMETRY_BUFFER_SIZE)
+		return false;
+	else
+		return true;
+}
 
-	if(size > GEOMETRY_BUFFER_SIZE)
-		return NULL;
-
-	if(offset + size > GEOMETRY_BUFFER_SIZE)
-		offset = 0;
-
-	void *bufferLoc = pglState->geometryBuffer + offset;
+static void* _bufferArray(const void *data, GLsizei size)
+{
+	void *cache = pglState->geometryBuffer[pglState->geometryBufferCurrent] + pglState->geometryBufferOffset;
 
 	if(data != NULL)
-		memcpy(bufferLoc, data, size);
+		memcpy(cache, data, size);
 
-	offset += size;
+	pglState->geometryBufferOffset += size;
 
-	return bufferLoc;
+	return cache;
 }
 
 void glVertexPointer(GLint size, GLenum type, GLsizei stride, const GLvoid * pointer)
@@ -112,17 +109,17 @@ void glColorPointer(GLint size, GLenum type, GLsizei stride, const GLvoid * poin
 
 void glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid* pointer)
 {
-	AttribPointer *texcoord_array = &pglState->texCoordArrayPointer[pglState->texUnitActiveClient];
+	AttribPointer *texCoordArray = &pglState->texCoordArrayPointer[pglState->texUnitActiveClient];
 
 	switch(type)
 	{
 		case GL_SHORT:
-			texcoord_array->type = GPU_SHORT;
-			texcoord_array->stride = size * 2;
+			texCoordArray->type = GPU_SHORT;
+			texCoordArray->stride = size * 2;
 			break;
 		case GL_FLOAT:
-			texcoord_array->type = GPU_FLOAT;
-			texcoord_array->stride = size * sizeof(GLfloat);
+			texCoordArray->type = GPU_FLOAT;
+			texCoordArray->stride = size * sizeof(GLfloat);
 			break;
 		default:
 			printf("%s: unimplemented type: %i\n", __FUNCTION__, type);
@@ -131,12 +128,12 @@ void glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid* po
 
 	if(stride)
 	{
-		texcoord_array->padding = (stride - texcoord_array->stride) / 4;
-		texcoord_array->stride = stride;
+		texCoordArray->padding = (stride - texCoordArray->stride) / 4;
+		texCoordArray->stride = stride;
 	}
 
-	texcoord_array->pointer = pointer;
-	texcoord_array->size = size;
+	texCoordArray->pointer = pointer;
+	texCoordArray->size = size;
 }
 
 void glEnableClientState(GLenum array)
@@ -173,215 +170,114 @@ void glDisableClientState(GLenum array)
 
 void glDrawArrays(GLenum mode, GLint first, GLsizei count)
 {
-	uint8_t  buffer_count 			= 0;
-	uint16_t attributes_fixed_mask 	= 0xFFF;
-	uint64_t attributes_format 		= 0x00;
-	uint64_t attributes_permutation = 0x3210;
-
-	AttribPointer *vertex_array 	= &pglState->vertexArrayPointer;
-	AttribPointer *color_array 		= &pglState->colorArrayPointer;
-	AttribPointer *texcoord_array 	=  pglState->texCoordArrayPointer;
-
-	void *array_cache;
-
 	if(pglState->vertexArrayState == GL_FALSE)
 		return;
 
-	pglState_flush();
-
-	array_cache = _cacheArray(vertex_array->pointer, vertex_array->stride * count);
-
-	attributes_format |= GPU_ATTRIBFMT(0, vertex_array->size, vertex_array->type);
-	_picaAttribBufferOffset(buffer_count, (uint32_t)array_cache - __ctru_linear_heap);
-	_configAttribBuffer(buffer_count, 0x0, vertex_array->stride, 1, vertex_array->padding);
-
-	buffer_count++;
-
-	if(pglState->colorArrayState == GL_FALSE)
-	{
-		attributes_fixed_mask = 1 << 1;
-
-		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 1);
-		_picaFixedAttribute(pglState->currentColor.r, pglState->currentColor.g, pglState->currentColor.b, pglState->currentColor.a);
-	}
-	else
-	{
-		array_cache = _cacheArray(color_array->pointer, color_array->stride * count);
-
-		attributes_format |= GPU_ATTRIBFMT(1, color_array->size, color_array->type);
-		_picaAttribBufferOffset(buffer_count, (uint32_t)array_cache - __ctru_linear_heap);
-		_configAttribBuffer(buffer_count, 0x1, color_array->stride, 1, color_array->padding);
-
-		buffer_count++;
-	}
-
-	if(pglState->texCoordArrayState[0] == GL_FALSE)
-	{
-		attributes_fixed_mask = 1 << 2;
-
-		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 2);
-		_picaFixedAttribute(1, 1, 0, 0);
-	}
-	else
-	{
-		array_cache = _cacheArray(texcoord_array[0].pointer, texcoord_array[0].stride * count);
-
-		attributes_format |= GPU_ATTRIBFMT(2, texcoord_array[0].size, texcoord_array[0].type);
-		_picaAttribBufferOffset(buffer_count, (uint32_t)array_cache - __ctru_linear_heap);
-		_configAttribBuffer(buffer_count, 0x2, texcoord_array[0].stride, 1, texcoord_array[0].padding);
-
-		buffer_count++;
-	}
-
-	if(pglState->texCoordArrayState[1] == GL_FALSE && pglState->texUnitState[1] == GL_FALSE)
-	{
-		attributes_fixed_mask = 1 << 3;
-
-		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 3);
-		_picaFixedAttribute(1, 1, 0, 0);
-	}
-	else
-	{
-		array_cache = _cacheArray(texcoord_array[1].pointer, texcoord_array[1].stride * count);
-
-		attributes_format |= GPU_ATTRIBFMT(3, texcoord_array[1].size, texcoord_array[1].type);
-		_picaAttribBufferOffset(buffer_count, (uint32_t)array_cache - __ctru_linear_heap);
-		_configAttribBuffer(buffer_count, 0x3, texcoord_array->stride, 1, texcoord_array->padding);
-
-		buffer_count++;
-	}
-
-	_picaAttribBuffersFormat(attributes_format, attributes_fixed_mask, attributes_permutation, 4);
-
-	GPU_Primitive_t primitive_type;
-
-	switch(mode)
-	{
-		case GL_TRIANGLES: 
-			primitive_type = GPU_TRIANGLES; 
-			break;
-		case GL_TRIANGLE_FAN:
-			primitive_type = GPU_TRIANGLE_FAN; 
-			break;
-		case GL_TRIANGLE_STRIP:
-			primitive_type = GPU_TRIANGLE_STRIP;
-			break;
-		default:
-			primitive_type = GPU_TRIANGLE_FAN;
-	}
-
-	_picaDrawArray(primitive_type, first, count);
-
-	if(++pglState->batchedDraws > MAX_BATCHED_DRAWS)
-		glFlush();
+	glDrawRangeElements(mode, first, count, 0, GL_UNSIGNED_SHORT, NULL);
 }
 
 void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices)
 {
-	if(type != GL_UNSIGNED_SHORT)
+	if(type != GL_UNSIGNED_SHORT || pglState->vertexArrayState == GL_FALSE)
 		return;
 
-	uint32_t  vertex_count = 0;
+	uint32_t end = 0;
 
 	for(int i = 0; i < count; i++)
 	{
-			if(vertex_count < ((GLushort*)indices)[i])
-				vertex_count = ((GLushort*)indices)[i];
+			if(end < ((GLushort*)indices)[i])
+				end = ((GLushort*)indices)[i];
 	}
 
-	vertex_count++;
+	end++;
 
-	glDrawRangeElements( mode, 0, vertex_count, count, type, indices );
+	glDrawRangeElements( mode, 0, end, count, type, indices );
 }
 
 void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices )
 {
-	uint8_t  buffer_count 			= 0;
-	uint16_t attributes_fixed_mask 	= 0xFFF;
-	uint64_t attributes_format 		= 0x00;
-	uint64_t attributes_permutation = 0x3210;
-
-	AttribPointer *vertex_array 	= &pglState->vertexArrayPointer;
-	AttribPointer *color_array 		= &pglState->colorArrayPointer;
-	AttribPointer *texcoord_array 	= pglState->texCoordArrayPointer;
-
-	void *array_cache;
-
-	if(type != GL_UNSIGNED_SHORT)
+	if(type != GL_UNSIGNED_SHORT || pglState->vertexArrayState == GL_FALSE)
 		return;
 
-	uint16_t* index_array  = _cacheArray(indices, sizeof(uint16_t) * count);
+	void *arrayCache = NULL;
 
+	uint8_t  bufferCount 			= 0;
+	uint16_t attributesFixedMask 	= 0xFFF;
+	uint64_t attributesFormat 		= 0x00;
+	uint64_t attributesPermutation  = 0x3210;
 
-	if(pglState->vertexArrayState == GL_FALSE)
-		return;
+	AttribPointer *vertexArray 	    = &pglState->vertexArrayPointer;
+	AttribPointer *colorArray 		= &pglState->colorArrayPointer;
+	AttribPointer *texCoordArray 	= pglState->texCoordArrayPointer;
 
-	pglState_flush();
+	if(_checkBufferLimit((end * 12 * sizeof(GLfloat)) + (sizeof(GLushort) * count)) == false)
+		glFlush();
 
-	array_cache = _cacheArray(vertex_array->pointer, vertex_array->stride * end);
+	_stateFlush();
 
-	attributes_format |= GPU_ATTRIBFMT(0, vertex_array->size, vertex_array->type);
-	_picaAttribBufferOffset(buffer_count, (uint32_t)array_cache - __ctru_linear_heap);
-	_configAttribBuffer(buffer_count, 0x0, vertex_array->stride, 1, vertex_array->padding);
+	arrayCache = _bufferArray(vertexArray->pointer, vertexArray->stride * end);
 
-	buffer_count++;
+	attributesFormat |= GPU_ATTRIBFMT(0, vertexArray->size, vertexArray->type);
+	_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
+	_configAttribBuffer(bufferCount, 0x0, vertexArray->stride, 1, vertexArray->padding);
+
+	bufferCount++;
 
 	if(pglState->colorArrayState == GL_FALSE)
 	{
-		attributes_fixed_mask = 1 << 1;
+		attributesFixedMask = 1 << 1;
 
 		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 1);
 		_picaFixedAttribute(pglState->currentColor.r, pglState->currentColor.g, pglState->currentColor.b, pglState->currentColor.a);
 	}
 	else
 	{
-		array_cache = _cacheArray(color_array->pointer, color_array->stride * end);
+		arrayCache = _bufferArray(colorArray->pointer, colorArray->stride * end);
 
-		attributes_format |= GPU_ATTRIBFMT(1, color_array->size, color_array->type);
-		_picaAttribBufferOffset(buffer_count, (uint32_t)array_cache - __ctru_linear_heap);
-		_configAttribBuffer(buffer_count, 0x1, color_array->stride, 1, color_array->padding);
+		attributesFormat |= GPU_ATTRIBFMT(1, colorArray->size, colorArray->type);
+		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
+		_configAttribBuffer(bufferCount, 0x1, colorArray->stride, 1, colorArray->padding);
 
-		buffer_count++;
+		bufferCount++;
 	}
 
 	if(pglState->texCoordArrayState[0] == GL_FALSE)
 	{
-		attributes_fixed_mask = 1 << 2;
+		attributesFixedMask = 1 << 2;
 
 		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 2);
 		_picaFixedAttribute(1, 1, 0, 0);
 	}
 	else
-	{
-		array_cache = _cacheArray(texcoord_array[0].pointer, texcoord_array[0].stride * end);
+	{	
+		arrayCache = _bufferArray(texCoordArray[0].pointer, texCoordArray[0].stride * end);
 
-		attributes_format |= GPU_ATTRIBFMT(2, texcoord_array[0].size, texcoord_array[0].type);
-		_picaAttribBufferOffset(buffer_count, (uint32_t)array_cache - __ctru_linear_heap);
-		_configAttribBuffer(buffer_count, 0x2, texcoord_array[0].stride, 1, texcoord_array[0].padding);
+		attributesFormat |= GPU_ATTRIBFMT(2, texCoordArray[0].size, texCoordArray[0].type);
+		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
+		_configAttribBuffer(bufferCount, 0x2, texCoordArray[0].stride, 1, texCoordArray[0].padding);
 
-		buffer_count++;
+		bufferCount++;
 	}
 
 	if(pglState->texCoordArrayState[1] == GL_FALSE && pglState->texUnitState[1] == GL_FALSE)
 	{
-		attributes_fixed_mask = 1 << 3;
+		attributesFixedMask = 1 << 3;
 
 		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 3);
 		_picaFixedAttribute(1, 1, 0, 0);
 	}
 	else
-	{
-		array_cache = _cacheArray(texcoord_array[1].pointer, texcoord_array[1].stride * end);
+	{	
+		arrayCache = _bufferArray(texCoordArray[1].pointer, texCoordArray[1].stride * end);
 
-		attributes_format |= GPU_ATTRIBFMT(3, texcoord_array[1].size, texcoord_array[1].type);
-		_picaAttribBufferOffset(buffer_count, (uint32_t)array_cache - __ctru_linear_heap);
-		_configAttribBuffer(buffer_count, 0x3, texcoord_array->stride, 1, texcoord_array->padding);
+		attributesFormat |= GPU_ATTRIBFMT(3, texCoordArray[1].size, texCoordArray[1].type);
+		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
+		_configAttribBuffer(bufferCount, 0x3, texCoordArray->stride, 1, texCoordArray->padding);
 
-		buffer_count++;
+		bufferCount++;
 	}
 
-	_picaAttribBuffersFormat(attributes_format, attributes_fixed_mask, attributes_permutation, 4);
-
+	_picaAttribBuffersFormat(attributesFormat, attributesFixedMask, attributesPermutation, 4);
 
 	GPU_Primitive_t primitive_type;
 
@@ -400,8 +296,14 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 			primitive_type = GPU_GEOMETRY_PRIM;
 	}
 	
-	_picaDrawElements(primitive_type, (uint32_t)index_array - __ctru_linear_heap, count);
+	if(indices)
+	{
+		uint16_t* index_array  = _bufferArray(indices, sizeof(uint16_t) * count);
 
-	if(++pglState->batchedDraws > MAX_BATCHED_DRAWS)
-		glFlush();
+		_picaDrawElements(primitive_type, (uint32_t)index_array - __ctru_linear_heap, count);
+	}
+	else
+	{
+		_picaDrawArray(primitive_type, start, count);
+	}
 }

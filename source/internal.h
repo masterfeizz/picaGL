@@ -13,8 +13,8 @@
 
 #define MAX_BATCHED_DRAWS 200
 
-#define GEOMETRY_BUFFER_SIZE 0x240000
-#define COMMAND_BUFFER_LENGTH 0x100000
+#define GEOMETRY_BUFFER_SIZE 0x20000
+#define COMMAND_BUFFER_LENGTH 0x40000
 
 #define COMMAND_BUFFER_SIZE   COMMAND_BUFFER_LENGTH * 4
 
@@ -72,6 +72,7 @@ typedef struct {
 
 typedef struct {
 	gxCmdQueue_s 		gxQueue;
+
 	uint32_t			*commandBuffer[2], commandBufferLength;
 	uint32_t			*colorBuffer, *depthBuffer;
 
@@ -89,6 +90,7 @@ typedef struct {
 
 	GLfloat				depthmapNear, depthmapFar;
 	GLfloat				polygonOffset;
+	GLboolean			polygonOffsetState;
 
 	GLboolean			cullState;
 	GLenum				cullMode;
@@ -155,7 +157,8 @@ typedef struct {
 	color_rgba			currentColor;
 	texcoord			currentTexCoord[2];
 
-	void 				*geometryBuffer;
+	void 				*geometryBuffer[2];
+	GLuint 				 geometryBufferOffset, geometryBufferCurrent;
 
 	GLuint				changes;
 	GLuint 				batchedDraws;
@@ -163,10 +166,10 @@ typedef struct {
 
 extern picaGLState *pglState;
 
-void pglState_init();
-void pglState_reset();
-void pglState_flush();
-void pglState_default();
+void _stateInitialize();
+void _stateReset();
+void _stateFlush();
+void _stateDefault();
 
 /* pica.c */
 void _picaAttribBuffersLocation(const void *location);
@@ -186,7 +189,7 @@ void _picaEarlyDepthTest(bool enabled);
 void _picaStencilTest(bool enabled, GPU_TESTFUNC function, int reference, u32 buffer_mask, u32 write_mask);
 void _picaStencilOp(GPU_STENCILOP sfail, GPU_STENCILOP dfail, GPU_STENCILOP pass);
 void _picaTextureEnvSet(uint8_t id, TextureEnv *env);
-void TextureEnv_reset(TextureEnv* env);
+void _picaTextureEnvReset(TextureEnv* env);
 void _picaAlphaTest(bool enable, GPU_TESTFUNC function, uint8_t ref);
 void _picaUniformFloat(GPU_SHADER_TYPE type, uint32_t startreg, float *data, uint32_t numreg);
 void _picaDepthTestWriteMask(bool enable, GPU_TESTFUNC function, GPU_WRITEMASK writemask);

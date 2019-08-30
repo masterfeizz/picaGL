@@ -42,3 +42,11 @@ void glDepthRange(GLclampd nearVal, GLclampd farVal)
 
 	pglState->changes |= STATE_DEPTHMAP_CHANGE;
 }
+
+void glPolygonOffset(GLfloat factor, GLfloat units) 
+{
+	//Not correct, but seems to do it for my needs
+	pglState->polygonOffset = units / (1 << 10);
+
+	pglState->changes |= STATE_DEPTHMAP_CHANGE;
+}

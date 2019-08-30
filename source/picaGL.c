@@ -1,6 +1,38 @@
 #include <stdio.h>
 #include "internal.h"
 
+static aptHookCookie _hookCookie;
+
+static void _AptEventHook(APT_HookType type, void* param)
+{
+
+	switch (type)
+	{
+		case APTHOOK_ONSUSPEND:
+		{
+			_queueWaitAndClear();
+			break;
+		}
+		case APTHOOK_ONRESTORE:
+		{
+			GX_BindQueue(&pglState->gxQueue);
+			gxCmdQueueRun(&pglState->gxQueue);
+
+			_picaRenderBuffer(pglState->colorBuffer, pglState->depthBuffer);
+			_picaAttribBuffersLocation((void*)__ctru_linear_heap);
+
+			for(int i = 1; i < 6; i++)
+				_picaTextureEnvSet(i, &pglState->texenv[PGL_TEXENV_DUMMY]);
+
+			shaderProgramUse(&pglState->basicShader);
+			pglState->changes |= 0xFFFFFFFF;
+			break;
+		}
+		default:
+			break;
+	}
+}
+
 void pglInit()
 {
 	static int pgl_initialized = 0;
@@ -11,13 +43,20 @@ void pglInit()
 	pglState = malloc(sizeof(picaGLState));
 	memset(pglState, 0, sizeof(picaGLState));
 	
-	pglState_init();
-	pglState_default();
+	_stateInitialize();
+	_stateDefault();
+
+	aptHook(&_hookCookie, _AptEventHook, NULL);
 }
 
 void pglExit()
 {
+	aptUnhook(&_hookCookie);
 
+	_queueWaitAndClear();
+	GX_BindQueue(NULL);
+
+	//TODO: Clear memory
 }
 
 void pglSwapBuffers()

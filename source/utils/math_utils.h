@@ -66,6 +66,5 @@ void matrix4x4_rotate_z(matrix4x4* mtx, float angle, bool bRightSide);
 
 // Special versions of the projection matrices that take the 3DS' screen orientation into account
 void matrix4x4_ortho_tilt(matrix4x4* mtx, float left, float right, float bottom, float top, float near, float far);
-void matrix4x4_persp_tilt(matrix4x4* mtx, float fovy, float aspect, float near, float far);
 void matrix4x4_frustum(matrix4x4 *mtx, float left, float right, float bottom, float top, float near, float far);
 void matrix4x4_fix_projection(matrix4x4 *mtx);

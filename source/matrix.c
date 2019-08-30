@@ -129,3 +129,22 @@ void glLoadMatrixf(const GLfloat* m)
 
 	pglState->changes |= STATE_MATRIX_CHANGE;
 }
+
+void glMultMatrixf(const GLfloat *m)
+{
+	matrix4x4 in, tmp;
+	
+	for(int i = 0; i < 4; i++)
+	{
+		in.row[i].x = m[0 + i];
+		in.row[i].y = m[4 + i];
+		in.row[i].z = m[8 + i];
+		in.row[i].w = m[12 + i];
+	}
+
+	matrix4x4_multiply(&tmp, pglState->matrix_current, &in);
+
+	*pglState->matrix_current = tmp;
+
+	pglState->changes |= STATE_MATRIX_CHANGE;
+}

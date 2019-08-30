@@ -16,13 +16,8 @@ static size_t _determineBPP(GPU_TEXCOLOR format)
 		case GPU_RGB8:   return 3;
 		case GPU_RGBA5551:
 		case GPU_RGB565:
-		case GPU_RGBA4:
-		case GPU_LA8:
-		case GPU_HILO8:  return 2;
-		case GPU_L8:
-		case GPU_A8:
-		case GPU_LA4:
-		case GPU_ETC1A4: return 1;
+		case GPU_RGBA4:  return 2;
+
 		default: 		 return 4;
 	}
 }
@@ -39,9 +34,7 @@ static GPU_TEXCOLOR _determineHardwareFormat(GLenum format)
 		case GL_RGB8:
 		case GL_RGB:
 		case GL_RGB5:  return GPU_RGB565;
-		case GL_LUMINANCE:
-		case GL_LUMINANCE8: return GPU_L8;
-		case GL_LUMINANCE8_ALPHA8: return GPU_LA4;
+
 		default: return GPU_RGBA4;
 	}
 }
@@ -65,78 +58,6 @@ static inline uint16_t rgba8_to_rgb565(uint32_t p)
 	return (b | (g << 5) | (r << 11));
 }
 
-static inline uint8_t rgba8_to_l8(uint32_t p)
-{
-	uint8_t *c = (uint8_t*)&p;
-	uint8_t l = 0;
-	l += c[2] * 0.0722f;
-	l += c[1] * 0.7152f;
-	l += c[0] * 0.2126f;
-	return l;
-}
-
-static inline uint8_t rgba8_to_la4(uint32_t p)
-{
-	uint8_t *c = (uint8_t*)&p;
-	uint8_t l = rgba8_to_l8(p);
-	uint8_t a = c[3];
-    return (a >> 4) | (l & 0xF0);
-}
-
-static inline uint32_t texture_swizzle_coord(int x, int y, int width)
-{
-	uint32_t pos = 	(x & 0x1) << 0 | ((x & 0x2) << 1) | ((x & 0x4) << 2) |
-					(y & 0x1) << 1 | ((y & 0x2) << 2) | ((y & 0x4) << 3);
-
-	return ((x >> 3) << 6) + ((y >> 3) * ((width >> 3) << 6)) + pos;
-}
-
-static inline void _tileTexture(TextureObject *texture, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid* data)
-{
-	if(format != GL_RGBA || type != GL_UNSIGNED_BYTE)
-		return;
-
-	void *tiled_output = texture->data;
-
-	if(texture->in_vram)
-		tiled_output = linearAlloc(texture->width * texture->height * _determineBPP(texture->format));
-
-	if(!tiled_output)
-		return;
-
-	uint32_t texel, offset;
-
-	for (int y = 0; y < height; y++)
-	{
-		for (int x = 0; x < width; x++)
-		{
-			offset = texture_swizzle_coord(x, (height - 1 - y), texture->width);
-			texel = ((uint32_t*)data)[x + (y * width)];
-
-			if(texture->format == GPU_RGBA4)
-				((uint16_t *)tiled_output)[offset] = rgba8_to_rgba4(texel);
-			else if(texture->format == GPU_RGBA8)
-				((uint32_t *)tiled_output)[offset] = __builtin_bswap32(texel);
-			else if(texture->format == GPU_RGB565)
-				((uint16_t *)tiled_output)[offset] = rgba8_to_rgb565(texel);
-			else if(texture->format == GPU_L8)
-				((uint8_t*)tiled_output)[offset] = rgba8_to_l8(texel);
-			else if(texture->format == GPU_LA4)
-				((uint8_t*)tiled_output)[offset] = rgba8_to_la4(texel);
-		}
-	}
-
-	GSPGPU_FlushDataCache(tiled_output, texture->width * texture->height * _determineBPP(texture->format));
-
-	if(texture->in_vram)
-	{
-		_queueWaitAndClear();
-		GX_TextureCopy(tiled_output, 0, texture->data, 0, texture->width * texture->height * _determineBPP(texture->format), 8);
-		_queueRun(false);
-		
-		linearFree(tiled_output);
-	}
-}
 
 static inline uint32_t _picaConvertWrap(uint32_t param)
 {
@@ -186,6 +107,67 @@ static inline void _textureDataFree(TextureObject *texture)
 	texture->data = NULL;
 }
 
+static inline uint32_t _textureSwizzleCoord(int x, int y, int width)
+{
+	uint32_t pos = 	(x & 0x1) << 0 | ((x & 0x2) << 1) | ((x & 0x4) << 2) |
+					(y & 0x1) << 1 | ((y & 0x2) << 2) | ((y & 0x4) << 3);
+
+	return ((x >> 3) << 6) + ((y >> 3) * ((width >> 3) << 6)) + pos;
+}
+
+static inline void _textureTile(TextureObject *texture, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, const uint32_t* data)
+{
+	uint32_t texel, offset;
+	void *tiled_output = texture->data;
+
+	if(texture->in_vram)
+	{
+		tiled_output = linearAlloc(texture->width * texture->height * _determineBPP(texture->format));
+
+		if(!tiled_output)
+			return;
+
+		if(xoffset || yoffset)
+		{
+			_queueWaitAndClear();
+			GX_TextureCopy(texture->data, 0, tiled_output, 0, texture->width * texture->height * _determineBPP(texture->format), 8);
+			_queueRun(false);
+			
+			_textureDataFree(texture);
+
+			texture->data = tiled_output;
+			texture->in_vram = false;
+		}
+	}
+
+	for(int y = 0; y < height; y++)
+	{
+		for(int x = 0; x < width; x++)
+		{
+			offset = _textureSwizzleCoord(x + xoffset, texture->height - 1 - (y + yoffset), texture->width);
+			texel = data[x + (y * width)];
+
+			if(texture->format == GPU_RGBA4)
+				((uint16_t *)tiled_output)[offset] = rgba8_to_rgba4(texel);
+			else if(texture->format == GPU_RGBA8)
+				((uint32_t *)tiled_output)[offset] = __builtin_bswap32(texel);
+			else if(texture->format == GPU_RGB565)
+				((uint16_t *)tiled_output)[offset] = rgba8_to_rgb565(texel);
+		}
+	}
+
+	GSPGPU_FlushDataCache(tiled_output, texture->width * texture->height * _determineBPP(texture->format));
+
+	if(texture->in_vram)
+	{
+		_queueWaitAndClear();
+		GX_TextureCopy(tiled_output, 0, texture->data, 0, texture->width * texture->height * _determineBPP(texture->format), 8);
+		_queueRun(false);
+		
+		linearFree(tiled_output);
+	}
+}
+
 void glActiveTexture(GLenum texture)
 {
 	uint8_t texunit = texture & 0x01;
@@ -208,7 +190,7 @@ void glClientActiveTexture( GLenum texture )
 
 void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid* data)
 {
-	if(level != 0 || target != GL_TEXTURE_2D)
+	if(level != 0 || target != GL_TEXTURE_2D || format != GL_RGBA || type != GL_UNSIGNED_BYTE)
 		return;
 
 	TextureObject *texture = pglState->textureBound[pglState->texUnitActive];
@@ -230,7 +212,24 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
 	else
 		texture->in_vram = false;
 
-	_tileTexture(texture, width, height, format, type, data);
+	if(data)
+		_textureTile(texture, 0, 0, width, height, data);
+
+	pglState->textureChanged = GL_TRUE;
+	pglState->changes |= STATE_TEXTURE_CHANGE;
+}
+
+void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid* data)
+{
+	if(level != 0 || target != GL_TEXTURE_2D || format != GL_RGBA || type != GL_UNSIGNED_BYTE)
+		return;
+
+	TextureObject *texture = pglState->textureBound[pglState->texUnitActive];
+
+	if(texture->data == NULL)
+		return;
+
+	_textureTile(texture, xoffset, yoffset, width, height, data);
 
 	pglState->textureChanged = GL_TRUE;
 	pglState->changes |= STATE_TEXTURE_CHANGE;
@@ -336,65 +335,6 @@ void glDeleteTextures(GLsizei n, const GLuint *textures)
 
 		free(texObject);
 	}
-}
-
-void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid* data)
-{
-	if((format != GL_RGBA) || (type != GL_UNSIGNED_BYTE))
-	{
-		return;
-	}
-
-	TextureObject *texture = pglState->textureBound[pglState->texUnitActive];
-
-	if(texture->data == NULL)
-		return;
-
-	void *tiled_output = texture->data;
-
-	if(texture->in_vram)
-	{
-		tiled_output = linearAlloc(texture->width * texture->height * _determineBPP(texture->format));
-
-		if(!tiled_output)
-			return;
-
-		_queueWaitAndClear();
-		GX_TextureCopy(texture->data, 0, tiled_output, 0, texture->width * texture->height * _determineBPP(texture->format), 8);
-		_queueRun(false);
-
-		_textureDataFree(texture);
-
-		texture->data = tiled_output;
-		texture->in_vram = false;
-	}
-
-	uint32_t texel, offset;
-
-	for(int y = 0; y < height; y++)
-	{
-		for(int x = 0; x < width; x++)
-		{
-			offset = texture_swizzle_coord(x + xoffset, texture->height - 1 - (y + yoffset), texture->width);
-			texel = ((uint32_t*)data)[x + (y * width)];
-
-			if(texture->format == GPU_RGBA4)
-				((uint16_t *)tiled_output)[offset] = rgba8_to_rgba4(texel);
-			else if(texture->format == GPU_RGBA8)
-				((uint32_t *)tiled_output)[offset] = __builtin_bswap32(texel);
-			else if(texture->format == GPU_RGB565)
-				((uint16_t *)tiled_output)[offset] = rgba8_to_rgb565(texel);
-			else if(texture->format == GPU_L8)
-				((uint8_t*)tiled_output)[offset] = rgba8_to_l8(texel);
-			else if(texture->format == GPU_LA4)
-				((uint8_t*)tiled_output)[offset] = rgba8_to_la4(texel);
-		}
-	}
-
-	GSPGPU_FlushDataCache(texture->data, texture->width * texture->height * _determineBPP(texture->format));
-
-	pglState->textureChanged = GL_TRUE;
-	pglState->changes |= STATE_TEXTURE_CHANGE;
 }
 
 GLboolean glIsTexture( GLuint texture ) 

@@ -100,9 +100,7 @@ void _picaDrawElements(GPU_Primitive_t primitive, uint32_t indexArray, uint32_t 
 
 	GPUCMD_AddMaskedWrite(GPUREG_PRIMITIVE_CONFIG, 0x2, primitive);
 	GPUCMD_AddMaskedWrite(GPUREG_RESTART_PRIMITIVE, 0x2, 0x00000001);
-	//index buffer (TODO : support multiple types)
 	GPUCMD_AddWrite(GPUREG_INDEXBUFFER_CONFIG, indexArray | (1 << 31));
-	//pass number of vertices
 	GPUCMD_AddWrite(GPUREG_NUMVERTICES, count);
 
 	GPUCMD_AddWrite(GPUREG_VERTEX_OFFSET, 0x00000000);
@@ -163,7 +161,7 @@ void _picaTextureEnvSet(uint8_t id, TextureEnv *env)
 	GPUCMD_AddIncrementalWrites(GPU_TEVID[id], param, 0x00000005);
 }
 
-void TextureEnv_reset(TextureEnv* env) {
+void _picaTextureEnvReset(TextureEnv* env) {
 	env->src_rgb = GPU_TEVSOURCES(GPU_PREVIOUS, 0, 0);
 	env->src_alpha = env->src_rgb;
 	env->op_rgb = GPU_TEVOPERANDS(0,0,0);
@@ -181,7 +179,7 @@ void _picaEarlyDepthTest(bool enabled) {
 }
 
 void _picaBlendFunction(GPU_BLENDEQUATION color_equation, GPU_BLENDEQUATION alpha_equation, GPU_BLENDFACTOR color_src, GPU_BLENDFACTOR color_dst, GPU_BLENDFACTOR alpha_src, GPU_BLENDFACTOR alpha_dst) {
-	GPUCMD_AddMaskedWrite(GPUREG_COLOR_OPERATION, 0x2, 0x00000100);
+	GPUCMD_AddWrite(GPUREG_COLOR_OPERATION, 0xE40100);
 	GPUCMD_AddWrite(GPUREG_BLEND_FUNC, color_equation | (alpha_equation<<8) | (color_src<<16) | (color_dst<<20) | (alpha_src<<24) | (alpha_dst<<28));
 }
 
@@ -204,9 +202,9 @@ void _picaFinalize(bool drew_something)
 {
 	if(drew_something)
 	{
-		GPUCMD_AddMaskedWrite(GPUREG_PRIMITIVE_CONFIG, 0x8, 0x00000000);
-		GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_FLUSH, 0x00000001);
-		GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_INVALIDATE, 0x00000001);
+		GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_FLUSH, 1);
+		GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_INVALIDATE, 1);
+		GPUCMD_AddWrite(GPUREG_EARLYDEPTH_CLEAR, 1);
 	}
 }
 
@@ -292,5 +290,5 @@ void _picaTexUnitEnable(GPU_TEXUNIT units)
 void _picaLogicOp(GPU_LOGICOP op)
 {
 	GPUCMD_AddWrite(GPUREG_LOGIC_OP, op);
-	GPUCMD_AddMaskedWrite(GPUREG_COLOR_OPERATION, 0x2, 0x00000000);
+	GPUCMD_AddWrite(GPUREG_COLOR_OPERATION, 0xE40000);
 }

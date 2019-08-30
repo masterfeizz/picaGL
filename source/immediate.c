@@ -19,7 +19,7 @@ void glBegin(GLenum mode)
 			primitive_type = GPU_TRIANGLE_FAN;
 	}
 
-	pglState_flush();
+	_stateFlush();
 
 	if(pglState->texUnitState[1])
 		_picaAttribBuffersFormat(0, 0XFFFF, 0x3210, 4);
@@ -39,7 +39,7 @@ void glColor3ubv(const GLubyte* v)
 	glColor4f((1.0f/255.0f)*v[0], (1.0f/255.0f)*v[1], (1.0f/255.0f)*v[2], 1.0f);
 }
 
-void glColor4f(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha)
+inline void glColor4f(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha)
 {
 	pglState->currentColor.r = red;
 	pglState->currentColor.g = green;
@@ -70,7 +70,8 @@ void glTexCoord2f(GLfloat s, GLfloat t)
 
 void glTexCoord2fv(const GLfloat *v)
 {
-	glTexCoord2f(v[0], v[1]);
+	pglState->currentTexCoord[0].s = v[0];
+	pglState->currentTexCoord[0].t = v[1];
 }
 
 void glVertex2f(GLfloat x, GLfloat y)
@@ -78,7 +79,7 @@ void glVertex2f(GLfloat x, GLfloat y)
 	glVertex3f(x, y, 0);
 }
 
-void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
+inline void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 {
 	_picaFixedAttribute(x, y, z, 0);
 	_picaFixedAttribute(pglState->currentColor.r, pglState->currentColor.g, pglState->currentColor.b, pglState->currentColor.a);
@@ -107,4 +108,26 @@ void glMultiTexCoord2f( GLenum target, GLfloat s, GLfloat t )
 
 	pglState->currentTexCoord[texunit].s = s;
 	pglState->currentTexCoord[texunit].t = t;
+}
+
+void glMultiTexCoord2fv( GLenum target, const GLfloat *v )
+{
+	glMultiTexCoord2f(target, v[0], v[1]);
+}
+
+void glArrayElement(GLint i)
+{
+	const void *vertexPointer  = pglState->vertexArrayPointer.pointer;
+	const void *colorPointer   = pglState->colorArrayPointer.pointer;
+	const void *texCoordPointer1 = pglState->texCoordArrayPointer[0].pointer;
+	const void *texCoordPointer2 = pglState->texCoordArrayPointer[1].pointer;
+
+	if(pglState->colorArrayState == GL_TRUE)
+		glColor4ubv(colorPointer + (i * pglState->colorArrayPointer.stride));
+	if(pglState->texCoordArrayState[0] == GL_TRUE)
+		glTexCoord2fv(texCoordPointer1 + (i * pglState->texCoordArrayPointer[0].stride));
+	if(pglState->texCoordArrayState[1] == GL_TRUE)
+		glMultiTexCoord2fv(GL_TEXTURE1, texCoordPointer2 + (i * pglState->texCoordArrayPointer[0].stride));
+
+	glVertex3fv(vertexPointer + (i * pglState->vertexArrayPointer.stride));
 }

@@ -11,6 +11,8 @@ void glClear(GLbitfield mask)
 	if(mask & GL_DEPTH_BUFFER_BIT)
 		write_mask |= GPU_WRITE_DEPTH;
 	
+	_picaDepthMap(0, 1.0, 0);
+	_picaLogicOp(GPU_LOGICOP_COPY);
 	_picaAlphaTest(false, GPU_ALWAYS, 0);
 	_picaDepthTestWriteMask(true, GPU_ALWAYS, write_mask);
 	_picaCullMode(GPU_CULL_NONE);
@@ -37,6 +39,8 @@ void glClear(GLbitfield mask)
 	pglState->changes |= STATE_DEPTHTEST_CHANGE;
 	pglState->changes |= STATE_CULL_CHANGE;
 	pglState->changes |= STATE_TEXTURE_CHANGE;
+	pglState->changes |= STATE_BLEND_CHANGE;
+	pglState->changes |= STATE_DEPTHMAP_CHANGE;
 }
 
 void glClearColor(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha)
@@ -75,15 +79,11 @@ void glFlush(void)
 {
 	static int nextCommandBuffer = 1;
 
-	if(pglState->batchedDraws == 0)
-		return;
-
 	_queueWaitAndClear();
 
+	_picaFinalize(true);
 	u32* commandBuffer;
 	u32  commandBuffer_size;
-
-	_picaFinalize(true);
 
 	GPUCMD_Split(&commandBuffer, &commandBuffer_size);
 
@@ -95,12 +95,15 @@ void glFlush(void)
 	GPUCMD_SetBuffer(pglState->commandBuffer[nextCommandBuffer], COMMAND_BUFFER_LENGTH, 0);
 
 	pglState->batchedDraws = 0;
+	pglState->geometryBufferOffset = 0;
+	pglState->geometryBufferCurrent = nextCommandBuffer;
 
 	nextCommandBuffer = !nextCommandBuffer;
 }
 
 void glFinish(void)
 {
+
 	glFlush();
 	_queueWaitAndClear();
 }

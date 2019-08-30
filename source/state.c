@@ -4,15 +4,18 @@
 
 picaGLState *pglState;
 
-void pglState_init()
+void _stateInitialize()
 {
 	pglState->gxQueue.maxEntries = 8;
 	pglState->gxQueue.entries = (gxCmdEntry_s*)malloc(pglState->gxQueue.maxEntries*sizeof(gxCmdEntry_s));
 
-	pglState->geometryBuffer = linearAlloc(GEOMETRY_BUFFER_SIZE);
+	pglState->geometryBuffer[0] = linearAlloc(GEOMETRY_BUFFER_SIZE);
+	pglState->geometryBuffer[1] = linearAlloc(GEOMETRY_BUFFER_SIZE);
 
-	pglState->colorBuffer = vramAlloc(400 * 240 * 4);
-	pglState->depthBuffer = vramAlloc(400 * 240 * 4);
+	pglState->geometryBufferCurrent = 0;
+
+	pglState->colorBuffer = vramAlloc(400 * 240 * 4); // 32-bit (RGBA8)
+	pglState->depthBuffer = vramAlloc(400 * 240 * 4); // 24-bit depth + 8-bit stencil
 
 	pglState->commandBuffer[0] = linearAlloc(COMMAND_BUFFER_SIZE);
 	pglState->commandBuffer[1] = linearAlloc(COMMAND_BUFFER_SIZE);
@@ -34,22 +37,17 @@ void pglState_init()
 	shaderProgramSetVsh(&pglState->clearShader, &pglState->clearShader_dvlb->DVLE[0]);
 
 	_picaRenderBuffer(pglState->colorBuffer, pglState->depthBuffer);
-	
 	_picaAttribBuffersLocation((void*)__ctru_linear_heap);
 
 }
 
-void pglState_default()
+void _stateDefault()
 {
 	for(int i = 0; i < 4; i++)
-		TextureEnv_reset(&pglState->texenv[i]);
+		_picaTextureEnvReset(&pglState->texenv[i]);
 
-	pglState->texenv[PGL_TEXENV_UNTEXTURED].src_rgb	= GPU_TEVSOURCES(GPU_PRIMARY_COLOR, GPU_PRIMARY_COLOR, GPU_PRIMARY_COLOR);
-	pglState->texenv[PGL_TEXENV_UNTEXTURED].op_rgb		= GPU_TEVOPERANDS(0,0,0);
-	pglState->texenv[PGL_TEXENV_UNTEXTURED].func_rgb	= GPU_REPLACE;
-	pglState->texenv[PGL_TEXENV_UNTEXTURED].src_alpha	= pglState->texenv[PGL_TEXENV_UNTEXTURED].src_rgb;
-	pglState->texenv[PGL_TEXENV_UNTEXTURED].op_alpha	= pglState->texenv[PGL_TEXENV_UNTEXTURED].op_rgb;
-	pglState->texenv[PGL_TEXENV_UNTEXTURED].func_alpha	= pglState->texenv[PGL_TEXENV_UNTEXTURED].func_rgb;
+	pglState->texenv[PGL_TEXENV_UNTEXTURED].src_rgb   = GPU_TEVSOURCES(GPU_PRIMARY_COLOR, GPU_PRIMARY_COLOR, GPU_PRIMARY_COLOR);
+	pglState->texenv[PGL_TEXENV_UNTEXTURED].src_alpha = pglState->texenv[PGL_TEXENV_UNTEXTURED].src_rgb;
 
 	pglState->depthmapNear 	= 0.0f;
 	pglState->depthmapFar 	= 1.0f;
@@ -69,12 +67,16 @@ void pglState_default()
 
 	pglState->writeMask = GPU_WRITE_ALL;
 
-	glActiveTexture(1);
+	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-	glActiveTexture(0);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_ONE, GL_ZERO);
+
 
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -86,7 +88,7 @@ void pglState_default()
 	pglState->changes = 0xffffff;
 }
 
-void pglState_flush()
+void _stateFlush()
 {
 	static matrix4x4 matrix_mvp;
 
@@ -124,7 +126,7 @@ void pglState_flush()
 
 	if(pglState->changes & STATE_DEPTHMAP_CHANGE)
 	{
-		_picaDepthMap(pglState->depthmapNear, pglState->depthmapFar, pglState->polygonOffset);
+		_picaDepthMap(pglState->depthmapNear, pglState->depthmapFar, pglState->polygonOffsetState ? pglState->polygonOffset : 0);
 	}
 
 	if(pglState->changes & STATE_DEPTHTEST_CHANGE)
@@ -179,6 +181,10 @@ void glDisable(GLenum cap)
 			pglState->depthTestState = false;
 			pglState->changes |= STATE_DEPTHTEST_CHANGE;
 			break;
+		case GL_POLYGON_OFFSET_FILL:
+			pglState->polygonOffsetState = false;
+			pglState->changes |= STATE_DEPTHTEST_CHANGE;
+			break;
 		case GL_STENCIL_TEST:
 			pglState->stencilTestState = false;
 			pglState->changes |= STATE_STENCIL_CHANGE;
@@ -212,6 +218,10 @@ void glEnable(GLenum cap)
 	{
 		case GL_DEPTH_TEST:
 			pglState->depthTestState = true;
+			pglState->changes |= STATE_DEPTHTEST_CHANGE;
+			break;
+		case GL_POLYGON_OFFSET_FILL:
+			pglState->polygonOffsetState = true;
 			pglState->changes |= STATE_DEPTHTEST_CHANGE;
 			break;
 		case GL_STENCIL_TEST:

@@ -99,52 +99,19 @@ void matrix4x4_ortho_tilt(matrix4x4* mtx, float left, float right, float bottom,
 	matrix4x4_zeros(&mp);
 
 	// Build standard orthogonal projection matrix
-	mp.row[0].x = 2.0f / (right - left);
-	mp.row[0].w = (left + right) / (left - right);
-	mp.row[1].y = 2.0f / (top - bottom);
-	mp.row[1].w = (bottom + top) / (bottom - top);
+	mp.row[1].x = 2.0f / (left - right);
+	mp.row[1].w = (left + right) / (right - left);
+	mp.row[0].y = 2.0f / (top - bottom);
+	mp.row[0].w = (bottom + top) / (bottom - top);
 	mp.row[2].z = 2.0f / (near - far);
 	mp.row[2].w = (far + near) / (far - near);
 	mp.row[3].w = 1.0f;
 
-	// Fix depth range to [-1, 0]
-	matrix4x4 mp2, mp3;
-	matrix4x4_identity(&mp2);
-	mp2.row[2].z = 0.5;
-	mp2.row[2].w = -0.5;
-	matrix4x4_multiply(&mp3, &mp2, &mp);
+	//Adjust depth range from [-1, 1] to [-1, 0]
+	mp.row[2].z = (mp.row[2].z * 0.5f);
+	mp.row[2].w = (mp.row[2].w * 0.5f) - 0.5f;
 
-	// Fix the 3DS screens' orientation by swapping the X and Y axis
-	matrix4x4_identity(&mp2);
-	mp2.row[0].x = 0.0;
-	mp2.row[0].y = 1.0;
-	mp2.row[1].x = -1.0; // flipped
-	mp2.row[1].y = 0.0;
-	matrix4x4_multiply(mtx, &mp2, &mp3);
-}
-
-void matrix4x4_persp_tilt(matrix4x4* mtx, float fovx, float invaspect, float near, float far)
-{
-	float fovx_tan = tanf(fovx / 2);
-	matrix4x4 mp;
-	matrix4x4_zeros(&mp);
-
-	// Build standard perspective projection matrix
-	mp.row[0].x = 1.0f / fovx_tan;
-	mp.row[1].y = 1.0f / (fovx_tan*invaspect);
-	mp.row[2].z = (near + far) / (near - far);
-	mp.row[2].w = (2 * near * far) / (near - far);
-	mp.row[3].z = -1.0f;
-
-	// Fix depth range to [-1, 0]
-	matrix4x4 mp2;
-	matrix4x4_identity(&mp2);
-	mp2.row[2].z = 0.5;
-	mp2.row[2].w = -0.5;
-	matrix4x4_multiply(mtx, &mp2, &mp);
-
-	// Rotate the matrix one quarter of a turn CCW in order to fix the 3DS screens' orientation
-	matrix4x4_rotate_z(mtx, M_PI / 2, true);
+	matrix4x4_copy(mtx, &mp);
 }
 
 void matrix4x4_frustum(matrix4x4 *mtx, float left, float right, float bottom, float top, float near, float far)
@@ -152,26 +119,19 @@ void matrix4x4_frustum(matrix4x4 *mtx, float left, float right, float bottom, fl
 	matrix4x4 mp;
 	matrix4x4_zeros(&mp);
 
-	mp.row[0].x =  2 * near / (right - left);
-	mp.row[0].z =  (right + left) / (right - left);
-	mp.row[1].y =  2 * near / (top - bottom);
-	mp.row[1].z =  (top + bottom) / (top - bottom);
-	mp.row[2].z =  (far + near) / (far - near);
-	mp.row[2].w =  (2 * far * near) / (far - near);
-	mp.row[3].z =  -1.0f;
+	mp.row[0].y = 2 * near / (top - bottom);
+	mp.row[0].z = (right + left) / (right - left);
+	mp.row[1].x = -2 * near / (right - left);
+	mp.row[1].z = (top + bottom) / (top - bottom);
+	mp.row[2].z = (far + near) / (far - near);
+	mp.row[2].w = (2 * far * near) / (far - near);
+	mp.row[3].z = -1.0f;
 
-	matrix4x4 mp2, mp3;
-	matrix4x4_identity(&mp2);
-	mp2.row[2].z = 0.5;
-	mp2.row[2].w = -0.5;
-	matrix4x4_multiply(&mp3, &mp2, &mp);
+	//Adjust depth range from [-1, 1], to [-1, 0]
+	mp.row[2].z = (mp.row[2].z * 0.5f) + 0.5f;
+	mp.row[2].w = (mp.row[2].w * 0.5f);
 
-	matrix4x4_identity(&mp2);
-	mp2.row[0].x = 0.0;
-	mp2.row[0].y = 1.0;
-	mp2.row[1].x = -1.0; // flipped
-	mp2.row[1].y = 0.0;
-	matrix4x4_multiply(mtx, &mp2, &mp3);
+	matrix4x4_copy(mtx, &mp);
 }
 
 void matrix4x4_fix_projection(matrix4x4 *mtx)
