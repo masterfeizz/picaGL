@@ -119,7 +119,7 @@ void glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid* po
 			break;
 		case GL_FLOAT:
 			texCoordArray->type = GPU_FLOAT;
-			texCoordArray->stride = size * sizeof(GLfloat);
+			texCoordArray->stride = size * 4;
 			break;
 		default:
 			printf("%s: unimplemented type: %i\n", __FUNCTION__, type);
@@ -173,7 +173,7 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count)
 	if(pglState->vertexArrayState == GL_FALSE)
 		return;
 
-	glDrawRangeElements(mode, first, count, 0, GL_UNSIGNED_SHORT, NULL);
+	glDrawRangeElements(mode, first, count, count, GL_UNSIGNED_SHORT, NULL);
 }
 
 void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices)
@@ -284,7 +284,7 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 	switch(mode)
 	{
 		case GL_TRIANGLES: 
-			primitive_type = GPU_GEOMETRY_PRIM; 
+			primitive_type = GPU_TRIANGLES; 
 			break;
 		case GL_TRIANGLE_FAN:
 			primitive_type = GPU_TRIANGLE_FAN; 

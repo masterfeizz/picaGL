@@ -725,6 +725,7 @@ void glFogiv( GLenum pname, const GLint *params );
 #define GL_CLAMP_TO_EDGE      0x812F
 #define GL_BGR          0x80E0
 #define GL_BGRA         0x80E1
+#define GL_UNSIGNED_SHORT_5_5_5_1       0x8034
 #define GL_UNSIGNED_SHORT_5_6_5     	0x8363
 #define GL_UNSIGNED_SHORT_5_6_5_REV     0x8364
 #define GL_UNSIGNED_SHORT_4_4_4_4_REV   0x8365

@@ -98,7 +98,7 @@ void _picaDrawArray(GPU_Primitive_t primitive, uint32_t first, uint32_t count){
 void _picaDrawElements(GPU_Primitive_t primitive, uint32_t indexArray, uint32_t count)
 {
 
-	GPUCMD_AddMaskedWrite(GPUREG_PRIMITIVE_CONFIG, 0x2, primitive);
+	GPUCMD_AddMaskedWrite(GPUREG_PRIMITIVE_CONFIG, 0x2, primitive != GPU_TRIANGLES ? primitive : GPU_GEOMETRY_PRIM);
 	GPUCMD_AddMaskedWrite(GPUREG_RESTART_PRIMITIVE, 0x2, 0x00000001);
 	GPUCMD_AddWrite(GPUREG_INDEXBUFFER_CONFIG, indexArray | (1 << 31));
 	GPUCMD_AddWrite(GPUREG_NUMVERTICES, count);
