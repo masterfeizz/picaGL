@@ -37,8 +37,8 @@ void glDepthMask(GLboolean flag)
 
 void glDepthRange(GLclampd nearVal, GLclampd farVal)
 {
-	pglState->depthmapNear = (float)nearVal;
-	pglState->depthmapFar  = (float)farVal;
+	pglState->depthmapNear = (float)farVal;
+	pglState->depthmapFar  = (float)nearVal;
 
 	pglState->changes |= STATE_DEPTHMAP_CHANGE;
 }

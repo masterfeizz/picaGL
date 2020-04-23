@@ -49,8 +49,8 @@ void _stateDefault()
 	pglState->texenv[PGL_TEXENV_UNTEXTURED].src_rgb   = GPU_TEVSOURCES(GPU_PRIMARY_COLOR, GPU_PRIMARY_COLOR, GPU_PRIMARY_COLOR);
 	pglState->texenv[PGL_TEXENV_UNTEXTURED].src_alpha = pglState->texenv[PGL_TEXENV_UNTEXTURED].src_rgb;
 
-	pglState->depthmapNear 	= 0.0f;
-	pglState->depthmapFar 	= 1.0f;
+	pglState->depthmapNear 	= 1.0f;
+	pglState->depthmapFar 	= 0.0f;
 	pglState->polygonOffset = 0.0f;
 
 	glDisable(GL_CULL_FACE);

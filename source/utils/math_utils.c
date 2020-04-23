@@ -128,16 +128,16 @@ void matrix4x4_frustum(matrix4x4 *mtx, float left, float right, float bottom, fl
 	mp.row[3].z = -1.0f;
 
 	//Adjust depth range from [-1, 1], to [-1, 0]
-	mp.row[2].z = (mp.row[2].z * 0.5f) + 0.5f;
-	mp.row[2].w = (mp.row[2].w * 0.5f);
+	mp.row[2].z = (-mp.row[2].z * 0.5f) + 0.5f;
+	mp.row[2].w = (-mp.row[2].w * 0.5f);
 
 	matrix4x4_copy(mtx, &mp);
 }
 
 void matrix4x4_fix_projection(matrix4x4 *mtx)
 {
-	mtx->row[2].z = -mtx->row[2].z;
-	mtx->row[2].w = -mtx->row[2].w;
+	mtx->row[2].z = mtx->row[2].z;
+	mtx->row[2].w = mtx->row[2].w;
 	
 	matrix4x4 mp, mp2;
 	matrix4x4_identity(&mp);
