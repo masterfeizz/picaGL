@@ -66,6 +66,7 @@ static inline uint32_t _picaConvertWrap(uint32_t param)
 		case GL_CLAMP:
 		case GL_CLAMP_TO_EDGE: return GPU_CLAMP_TO_EDGE;
 		case GL_REPEAT: return GPU_REPEAT;
+		case GL_MIRRORED_REPEAT: return GPU_MIRRORED_REPEAT;
 		default: return GPU_REPEAT;
 	}
 }
@@ -355,7 +356,25 @@ void glTexImage1D(GLenum target, GLint level, GLint internalformat, GLsizei widt
 	glTexImage2D( GL_TEXTURE_2D, level, internalformat, width, 1, border, format, type, pixels );
 }
 
-void glTexEnvf (GLenum target, GLenum pname, GLfloat param)
+void glTexEnvfv( GLenum target, GLenum pname, const GLfloat *params )
+{
+	if ((target != GL_TEXTURE_ENV) || (pname != GL_TEXTURE_ENV_COLOR))
+		return;
+
+	uint8_t texunit = pglState->texUnitActive;
+	TextureEnv *texenv  = &pglState->texenv[texunit];
+
+	uint8_t r = (uint8_t)(params[0] * 255);
+	uint8_t g = (uint8_t)(params[1] * 255);
+	uint8_t b = (uint8_t)(params[2] * 255);
+	uint8_t a = (uint8_t)(params[3] * 255);
+
+	texenv->color = r | (g << 8) | (b << 16) | (a << 24);
+	
+	pglState->changes |= STATE_TEXTURE_CHANGE;
+}
+
+inline void glTexEnvi (GLenum target, GLenum pname, GLint param)
 {
 	if ((target != GL_TEXTURE_ENV) || (pname != GL_TEXTURE_ENV_MODE))
 		return;
@@ -365,13 +384,13 @@ void glTexEnvf (GLenum target, GLenum pname, GLfloat param)
 
 	memset(texenv, 0, sizeof(TextureEnv));
 
-	switch ((int) param)
+	switch (param)
 	{
 	case GL_ADD:
 		texenv->func_rgb = GPU_ADD;
 		texenv->src_rgb  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
 
-		texenv->func_alpha = GPU_ADD;
+		texenv->func_alpha = GPU_MODULATE;
 		texenv->src_alpha  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
 		break;
 
@@ -393,7 +412,7 @@ void glTexEnvf (GLenum target, GLenum pname, GLfloat param)
 
 	case GL_DECAL:
 		texenv->func_rgb = GPU_INTERPOLATE;
-		texenv->src_rgb  = GPU_TEVSOURCES(texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, GPU_TEXTURE0 + texunit, GPU_TEXTURE0 + texunit);
+		texenv->src_rgb  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, GPU_TEXTURE0 + texunit);
 		texenv->op_rgb   = GPU_TEVOPERANDS(0,0, GPU_TEVOP_RGB_SRC_ALPHA);
 
 		texenv->func_alpha = GPU_REPLACE;
@@ -402,7 +421,7 @@ void glTexEnvf (GLenum target, GLenum pname, GLfloat param)
 
 	case GL_BLEND:
 		texenv->func_rgb = GPU_INTERPOLATE;
-		texenv->src_rgb  = GPU_TEVSOURCES(texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, GPU_CONSTANT, GPU_TEXTURE0 + texunit);
+		texenv->src_rgb  = GPU_TEVSOURCES(GPU_CONSTANT, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, GPU_TEXTURE0 + texunit);
 
 		texenv->func_alpha = GPU_MODULATE;
 		texenv->src_alpha  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
@@ -415,8 +434,7 @@ void glTexEnvf (GLenum target, GLenum pname, GLfloat param)
 	pglState->changes |= STATE_TEXTURE_CHANGE;
 }
 
-void glTexEnvi (GLenum target, GLenum pname, GLint param)
+void glTexEnvf (GLenum target, GLenum pname, GLfloat param)
 {
-	GLfloat p = param;
-	glTexEnvf(target, pname, p);
+	glTexEnvi (target, pname, (int)param);
 }

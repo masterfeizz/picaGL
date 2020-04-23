@@ -5,7 +5,6 @@ GLenum glGetError(void){ return GL_NO_ERROR; }
 
 void glDrawBuffer(GLenum mode) {}
 void glShadeModel(GLenum mode) {}
-void glTexEnvfv(GLenum target, GLenum pname, const GLfloat *params) {}
 void glReadBuffer(GLenum mode) {}
 void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLvoid* data) {}
 void glHint(GLenum target, GLenum mode) {}
