@@ -1,5 +1,11 @@
 #include "internal.h"
 
+static inline bool _addressIsLinear(const void* addr)
+{
+	u32 vaddr = (u32)addr;
+	return vaddr >= __ctru_linear_heap && vaddr < (__ctru_linear_heap + __ctru_linear_heap_size);
+}
+
 static void _configAttribBuffer(uint8_t id, uint64_t format, uint8_t stride, uint8_t count, uint32_t padding)
 {
 	uint32_t param[2];
@@ -202,9 +208,10 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 	void *arrayCache = NULL;
 
 	uint8_t  bufferCount 			= 0;
-	uint16_t attributesFixedMask 	= 0xFFF;
+	uint8_t  attributesCount		= 2;
+	uint16_t attributesFixedMask 	= 0x00;
 	uint64_t attributesFormat 		= 0x00;
-	uint64_t attributesPermutation  = 0x3210;
+	uint64_t attributesPermutation  = 0x10;
 
 	AttribPointer *vertexArray 	    = &pglState->vertexArrayPointer;
 	AttribPointer *colorArray 		= &pglState->colorArrayPointer;
@@ -215,7 +222,10 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 	_stateFlush();
 
-	arrayCache = _bufferArray(vertexArray->pointer, vertexArray->stride * end);
+	if(_addressIsLinear(vertexArray->pointer))
+		arrayCache = (void*)vertexArray->pointer;
+	else
+		arrayCache = _bufferArray(vertexArray->pointer, vertexArray->stride * end);
 
 	attributesFormat |= GPU_ATTRIBFMT(0, vertexArray->size, vertexArray->type);
 	_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
@@ -223,16 +233,12 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 	bufferCount++;
 
-	if(pglState->colorArrayState == GL_FALSE)
+	if(pglState->colorArrayState == GL_TRUE)
 	{
-		attributesFixedMask = 1 << 1;
-
-		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 1);
-		_picaFixedAttribute(pglState->currentColor.r, pglState->currentColor.g, pglState->currentColor.b, pglState->currentColor.a);
-	}
-	else
-	{
-		arrayCache = _bufferArray(colorArray->pointer, colorArray->stride * end);
+		if(_addressIsLinear(colorArray->pointer))
+			arrayCache = (void*)colorArray->pointer;
+		else
+			arrayCache = _bufferArray(colorArray->pointer, colorArray->stride * end);
 
 		attributesFormat |= GPU_ATTRIBFMT(1, colorArray->size, colorArray->type);
 		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
@@ -240,44 +246,52 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 		bufferCount++;
 	}
-
-	if(pglState->texCoordArrayState[0] == GL_FALSE)
-	{
-		attributesFixedMask = 1 << 2;
-
-		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 2);
-		_picaFixedAttribute(1, 1, 0, 0);
-	}
 	else
-	{	
-		arrayCache = _bufferArray(texCoordArray[0].pointer, texCoordArray[0].stride * end);
+	{
+		attributesFixedMask |= 1 << 1;
+
+		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 1);
+		_picaFixedAttribute(pglState->currentColor.r, pglState->currentColor.g, pglState->currentColor.b, pglState->currentColor.a);
+	}
+
+	if( pglState->texCoordArrayState[0] == GL_TRUE )
+	{
+		attributesPermutation |= 0x2 << (attributesCount * 4);
+
+		if(_addressIsLinear(texCoordArray[0].pointer))
+			arrayCache = (void*)texCoordArray[0].pointer;
+		else
+			arrayCache = _bufferArray(texCoordArray[0].pointer, texCoordArray[0].stride * end);
 
 		attributesFormat |= GPU_ATTRIBFMT(2, texCoordArray[0].size, texCoordArray[0].type);
 		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
 		_configAttribBuffer(bufferCount, 0x2, texCoordArray[0].stride, 1, texCoordArray[0].padding);
 
+		attributesCount++;
 		bufferCount++;
-	}
-
-	if(pglState->texCoordArrayState[1] == GL_FALSE && pglState->texUnitState[1] == GL_FALSE)
-	{
-		attributesFixedMask = 1 << 3;
-
-		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 3);
-		_picaFixedAttribute(1, 1, 0, 0);
 	}
 	else
-	{	
-		arrayCache = _bufferArray(texCoordArray[1].pointer, texCoordArray[1].stride * end);
+	{
+		attributesFixedMask |= 1 << 2;
+		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 2);
+		_picaFixedAttribute(1, 1, 0, 0);
+		attributesCount++;
+	}
 
+	if( (pglState->texCoordArrayState[1] == GL_TRUE) && (pglState->texUnitState[1] == GL_TRUE) )
+	{	
+		attributesPermutation |= 0x3 << (attributesCount * 4);
+		arrayCache = _bufferArray(texCoordArray[1].pointer, texCoordArray[1].stride * end);
+		
 		attributesFormat |= GPU_ATTRIBFMT(3, texCoordArray[1].size, texCoordArray[1].type);
 		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
-		_configAttribBuffer(bufferCount, 0x3, texCoordArray->stride, 1, texCoordArray->padding);
+		_configAttribBuffer(bufferCount, 0x3, texCoordArray[1].stride, 1, texCoordArray[1].padding);
 
+		attributesCount++;
 		bufferCount++;
 	}
 
-	_picaAttribBuffersFormat(attributesFormat, attributesFixedMask, attributesPermutation, 4);
+	_picaAttribBuffersFormat(attributesFormat, attributesFixedMask, attributesPermutation, attributesCount);
 
 	GPU_Primitive_t primitive_type;
 
@@ -293,7 +307,7 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 			primitive_type = GPU_TRIANGLE_STRIP;
 			break;
 		default:
-			primitive_type = GPU_GEOMETRY_PRIM;
+			primitive_type = GPU_TRIANGLES;
 	}
 	
 	if(indices)
