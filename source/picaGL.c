@@ -82,8 +82,6 @@ void pglSwapBuffers()
 	}
 	
 	_queueRun(true);
-
-	gfxSwapBuffersGpu();
 }
 
 void pglSelectScreen(uint8_t display, uint8_t side)

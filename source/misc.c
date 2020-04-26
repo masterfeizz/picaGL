@@ -11,6 +11,8 @@ void glClear(GLbitfield mask)
 	if(mask & GL_DEPTH_BUFFER_BIT)
 		write_mask |= GPU_WRITE_DEPTH;
 	
+	_picaViewport(0, 0, 240, 400);
+
 	_picaDepthMap(0, 1.0, 0);
 	_picaLogicOp(GPU_LOGICOP_COPY);
 	_picaAlphaTest(false, GPU_ALWAYS, 0);
@@ -35,12 +37,7 @@ void glClear(GLbitfield mask)
 
 	shaderProgramUse(&pglState->basicShader);
 
-	pglState->changes |= STATE_ALPHATEST_CHANGE;
-	pglState->changes |= STATE_DEPTHTEST_CHANGE;
-	pglState->changes |= STATE_CULL_CHANGE;
-	pglState->changes |= STATE_TEXTURE_CHANGE;
-	pglState->changes |= STATE_BLEND_CHANGE;
-	pglState->changes |= STATE_DEPTHMAP_CHANGE;
+	pglState->changes = STATE_ALL_CHANGE;
 }
 
 void glClearColor(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha)

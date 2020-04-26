@@ -28,6 +28,7 @@
 #define STATE_DEPTHMAP_CHANGE		(1 << 7)
 #define STATE_BLEND_CHANGE			(1 << 8)
 #define STATE_MATRIX_CHANGE 		(1 << 9)
+#define STATE_ALL_CHANGE			(0xffffffff);
 
 #define PGL_TEXENV_UNTEXTURED 2
 #define PGL_TEXENV_DUMMY 3
