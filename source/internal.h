@@ -28,6 +28,7 @@
 #define STATE_DEPTHMAP_CHANGE		(1 << 7)
 #define STATE_BLEND_CHANGE			(1 << 8)
 #define STATE_MATRIX_CHANGE 		(1 << 9)
+#define STATE_SCISSOR_CHANGE		(1 << 10)
 #define STATE_ALL_CHANGE			(0xffffffff);
 
 #define PGL_TEXENV_UNTEXTURED 2
@@ -117,6 +118,7 @@ typedef struct {
 	GLuint				matrix_projection_stack_counter;
 	matrix4x4			*matrix_current;
 
+	GLboolean			scissorState;
 	GLint 				scissorX, scissorY;
 	GLsizei 			scissorWidth, scissorHeight;
 
@@ -181,6 +183,7 @@ void _picaAttribBufferConfig(uint8_t id, uint64_t format, uint8_t stride, uint8_
 void _picaBlendFunction(GPU_BLENDEQUATION color_equation, GPU_BLENDEQUATION alpha_equation, GPU_BLENDFACTOR color_src, GPU_BLENDFACTOR color_dst, GPU_BLENDFACTOR alpha_src, GPU_BLENDFACTOR alpha_dst);
 
 void _picaViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+void _picaScissorTest(GPU_SCISSORMODE mode, u32 left, u32 top, u32 right, u32 bottom);
 void _picaRenderBuffer(uint32_t *colorBuffer, uint32_t *depthBuffer);
 void _picaCullMode(GPU_CULLMODE mode);
 

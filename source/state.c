@@ -100,6 +100,11 @@ void _stateFlush()
 		_picaViewport(pglState->viewportX, pglState->viewportY, pglState->viewportWidth, pglState->viewportHeight);
 	}
 
+	if(pglState->changes & STATE_SCISSOR_CHANGE)
+	{
+		_picaScissorTest(pglState->scissorState ? 0x3 : 0x0, pglState->scissorY, pglState->scissorX, pglState->scissorY + pglState->scissorHeight, pglState->scissorX + pglState->scissorWidth);
+	}
+
 	if(pglState->changes & STATE_STENCIL_CHANGE)
 	{
 		_picaStencilTest(pglState->stencilTestState, pglState->stencilTestFunction, pglState->stencilTestReference, pglState->stencilBufferMask, pglState->stencilWriteMask);
@@ -194,6 +199,8 @@ void glDisable(GLenum cap)
 			pglState->changes |= STATE_BLEND_CHANGE;
 			break;
 		case GL_SCISSOR_TEST:
+			pglState->scissorState = false;
+			pglState->changes |= STATE_SCISSOR_CHANGE;
 			break;
 		case GL_CULL_FACE:
 			pglState->cullState = false;
@@ -233,6 +240,8 @@ void glEnable(GLenum cap)
 			pglState->changes |= STATE_BLEND_CHANGE;
 			break;
 		case GL_SCISSOR_TEST:
+			pglState->scissorState = true;
+			pglState->changes |= STATE_SCISSOR_CHANGE;
 			break;
 		case GL_CULL_FACE:
 			pglState->cullState = true;

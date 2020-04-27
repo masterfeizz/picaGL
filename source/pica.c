@@ -43,6 +43,17 @@ void _picaViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
 	GPUCMD_AddWrite(GPUREG_VIEWPORT_XY, (y << 16) | (x & 0xFFFF));
 }
 
+void _picaScissorTest(GPU_SCISSORMODE mode, u32 left, u32 top, u32 right, u32 bottom)
+{
+	u32 param[3];
+
+	param[0] = mode;
+	param[1] = (top << 16) | (left & 0xFFFF);
+	param[2] = ((bottom-1) << 16) | ((right-1) & 0xFFFF);
+
+	GPUCMD_AddIncrementalWrites(GPUREG_SCISSORTEST_MODE, param, 3);
+}
+
 void _picaCullMode(GPU_CULLMODE mode)
 {
 	GPUCMD_AddWrite(GPUREG_FACECULLING_CONFIG, mode & 0x3);

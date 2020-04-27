@@ -12,7 +12,7 @@ void glClear(GLbitfield mask)
 		write_mask |= GPU_WRITE_DEPTH;
 	
 	_picaViewport(0, 0, 240, 400);
-
+	_picaScissorTest(0,0,0,0,0);
 	_picaDepthMap(0, 1.0, 0);
 	_picaLogicOp(GPU_LOGICOP_COPY);
 	_picaAlphaTest(false, GPU_ALWAYS, 0);
