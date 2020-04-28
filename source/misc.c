@@ -12,7 +12,9 @@ void glClear(GLbitfield mask)
 		write_mask |= GPU_WRITE_DEPTH;
 	
 	_picaViewport(0, 0, 240, 400);
-	_picaScissorTest(0,0,0,0,0);
+	
+	_picaScissorTest(pglState->scissorState ? 0x3 : 0x0, pglState->scissorY, pglState->scissorX, pglState->scissorY + pglState->scissorHeight, pglState->scissorX + pglState->scissorWidth);
+
 	_picaDepthMap(0, 1.0, 0);
 	_picaLogicOp(GPU_LOGICOP_COPY);
 	_picaAlphaTest(false, GPU_ALWAYS, 0);
@@ -121,4 +123,6 @@ void glScissor(GLint x, GLint y, GLsizei width, GLsizei height)
 	pglState->scissorY = y;
 	pglState->scissorWidth = width;
 	pglState->scissorHeight = height;
+
+	pglState->changes |= STATE_SCISSOR_CHANGE;
 }

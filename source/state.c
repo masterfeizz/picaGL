@@ -53,6 +53,9 @@ void _stateDefault()
 	pglState->depthmapFar 	= 0.0f;
 	pglState->polygonOffset = 0.0f;
 
+	glViewport(0, 0, 400, 240);
+	glScissor(0, 0, 400, 240);
+
 	glDisable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 	glAlphaFunc(GL_ALWAYS, 0.0);
