@@ -100,7 +100,7 @@ void _stateFlush()
 	
 	if(pglState->changes & STATE_VIEWPORT_CHANGE)
 	{
-		_picaViewport(pglState->viewportX, pglState->viewportY, pglState->viewportWidth, pglState->viewportHeight);
+		_picaViewport(pglState->viewportY, pglState->viewportX, pglState->viewportHeight, pglState->viewportWidth);
 	}
 
 	if(pglState->changes & STATE_SCISSOR_CHANGE)

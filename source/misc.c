@@ -1,5 +1,13 @@
 #include "internal.h"
 
+static GLint _GetScreenWidth()
+{
+	if(pglState->display == GFX_TOP)
+		return 400;
+	else
+		return 320;
+}
+
 void glClear(GLbitfield mask)
 {
 	shaderProgramUse(&pglState->clearShader);
@@ -109,17 +117,17 @@ void glFinish(void)
 
 void glViewport(GLint x, GLint y, GLsizei width, GLsizei height)
 {
-	pglState->viewportX = y;
-	pglState->viewportY = x;
-	pglState->viewportWidth = height;
-	pglState->viewportHeight = width;
+	pglState->viewportX = (_GetScreenWidth() - width) - x;
+	pglState->viewportY = y;
+	pglState->viewportHeight = height;
+	pglState->viewportWidth = width;
 
 	pglState->changes |= STATE_VIEWPORT_CHANGE;
 }
 
 void glScissor(GLint x, GLint y, GLsizei width, GLsizei height)
 {
-	pglState->scissorX = x;
+	pglState->scissorX = (_GetScreenWidth() - width) - x;
 	pglState->scissorY = y;
 	pglState->scissorWidth = width;
 	pglState->scissorHeight = height;
