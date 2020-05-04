@@ -382,49 +382,56 @@ inline void glTexEnvi (GLenum target, GLenum pname, GLint param)
 	uint8_t texunit = pglState->texUnitActive;
 	TextureEnv *texenv  = &pglState->texenv[texunit];
 
-	memset(texenv, 0, sizeof(TextureEnv));
-
 	switch (param)
 	{
 	case GL_ADD:
 		texenv->func_rgb = GPU_ADD;
 		texenv->src_rgb  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
+		texenv->op_rgb   = GPU_TEVOPERANDS(0, 0, 0);
 
 		texenv->func_alpha = GPU_MODULATE;
 		texenv->src_alpha  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
+		texenv->op_alpha   = GPU_TEVOPERANDS(0, 0, 0);
 		break;
 
 	case GL_REPLACE:
 		texenv->func_rgb = GPU_REPLACE;
 		texenv->src_rgb  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, 0, 0);
+		texenv->op_rgb   = GPU_TEVOPERANDS(0, 0, 0);
 
 		texenv->func_alpha = GPU_REPLACE;
 		texenv->src_alpha  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, 0, 0);
+		texenv->op_alpha   = GPU_TEVOPERANDS(0, 0, 0);
 		break;
 
 	case GL_MODULATE:
 		texenv->func_rgb = GPU_MODULATE;
 		texenv->src_rgb  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
+		texenv->op_rgb   = GPU_TEVOPERANDS(0, 0, 0);
 
 		texenv->func_alpha = GPU_MODULATE;
 		texenv->src_alpha  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
+		texenv->op_alpha   = GPU_TEVOPERANDS(0, 0, 0);
 		break;
 
 	case GL_DECAL:
 		texenv->func_rgb = GPU_INTERPOLATE;
 		texenv->src_rgb  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, GPU_TEXTURE0 + texunit);
-		texenv->op_rgb   = GPU_TEVOPERANDS(0,0, GPU_TEVOP_RGB_SRC_ALPHA);
+		texenv->op_rgb   = GPU_TEVOPERANDS(0, 0, GPU_TEVOP_RGB_SRC_ALPHA);
 
 		texenv->func_alpha = GPU_REPLACE;
 		texenv->src_alpha  = GPU_TEVSOURCES(GPU_PRIMARY_COLOR, 0, 0);
+		texenv->op_alpha   = GPU_TEVOPERANDS(0, 0, 0);
 		break;
 
 	case GL_BLEND:
 		texenv->func_rgb = GPU_INTERPOLATE;
-		texenv->src_rgb  = GPU_TEVSOURCES(GPU_CONSTANT, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, GPU_TEXTURE0 + texunit);
+		texenv->src_rgb  = GPU_TEVSOURCES(GPU_CONSTANT, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS,  GPU_TEXTURE0 + texunit);
+		texenv->op_rgb   = GPU_TEVOPERANDS(0, 0, 0);
 
 		texenv->func_alpha = GPU_MODULATE;
 		texenv->src_alpha  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
+		texenv->op_alpha   = GPU_TEVOPERANDS(0, 0, 0);
 		break;
 
 	default:
