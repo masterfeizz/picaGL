@@ -249,12 +249,13 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 	else
 	{
 		attributesFixedMask |= 1 << 1;
+		attributesFormat |= GPU_ATTRIBFMT(1, 4, GPU_FLOAT);
 
 		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 1);
 		_picaFixedAttribute(pglState->currentColor.r, pglState->currentColor.g, pglState->currentColor.b, pglState->currentColor.a);
 	}
 
-	if( pglState->texCoordArrayState[0] == GL_TRUE )
+	if( (pglState->texCoordArrayState[0] == GL_TRUE) && (pglState->texUnitState[0] == GL_TRUE) )
 	{
 		attributesPermutation |= 0x2 << (attributesCount * 4);
 
@@ -273,6 +274,8 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 	else
 	{
 		attributesFixedMask |= 1 << 2;
+		attributesFormat |= GPU_ATTRIBFMT(2, 2, GPU_FLOAT);
+
 		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 2);
 		_picaFixedAttribute(1, 1, 0, 0);
 		attributesCount++;
@@ -291,7 +294,7 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 		bufferCount++;
 	}
 
-	_picaAttribBuffersFormat(attributesFormat, attributesFixedMask, attributesPermutation, attributesCount);
+	_picaAttribBuffersFormat(attributesFormat, attributesFixedMask, attributesPermutation, bufferCount);
 
 	GPU_Primitive_t primitive_type;
 
@@ -320,4 +323,7 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 	{
 		_picaDrawArray(primitive_type, start, count);
 	}
+
+	if(++pglState->batchedDraws > MAX_BATCHED_DRAWS)
+		glFlush();
 }
