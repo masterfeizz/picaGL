@@ -82,6 +82,13 @@ void _picaAttribBuffersFormat(uint64_t format, uint16_t mask, uint64_t permutaio
 	GPUCMD_AddWrite(GPUREG_VSH_NUM_ATTR, (count - 1));
 }
 
+void _picaAttribBufferConfig(uint8_t id, uint64_t config)
+{
+	if(id > 0xB) return;
+
+	GPUCMD_AddIncrementalWrites(GPUREG_ATTRIBBUFFER0_CONFIG1 + (id * 0x03), (u32*)&config, 0x02);
+}
+
 void _picaAttribBufferOffset(uint8_t id, uint32_t offset)
 {
 	if(id > 0xB) return;

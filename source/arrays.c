@@ -6,11 +6,9 @@ static inline bool _addressIsLinear(const void* addr)
 	return vaddr >= __ctru_linear_heap && vaddr < (__ctru_linear_heap + __ctru_linear_heap_size);
 }
 
-static void _configAttribBuffer(uint8_t id, uint64_t format, uint8_t stride, uint8_t count, uint32_t padding)
+static uint64_t _configAttribBuffer(uint64_t format, uint8_t stride, uint8_t count, uint32_t padding)
 {
-	uint32_t param[2];
-
-	if(id > 0xB) return;
+	uint32_t *config = (uint32_t*)&format;
 
 	while(padding > 0)
 	{
@@ -24,10 +22,9 @@ static void _configAttribBuffer(uint8_t id, uint64_t format, uint8_t stride, uin
 		count++;
 	}
 
-	param[0] = format & 0xFFFFFFFF;
-	param[1] = (count << 28) | ((stride & 0xFF) << 16) | ((format >> 32) & 0xFFFF);
+	config[1] |= (count << 28) | ((stride & 0xFF) << 16);
 
-	GPUCMD_AddIncrementalWrites(GPUREG_ATTRIBBUFFER0_CONFIG1 + (id * 0x03), param, 0x02);
+	return format;
 }
 
 //Check if we have enough space in the current geometry buffer
@@ -53,15 +50,17 @@ static void* _bufferArray(const void *data, GLsizei size)
 
 void glVertexPointer(GLint size, GLenum type, GLsizei stride, const GLvoid * pointer)
 {
+	AttribPointer *vertexArray = &pglState->vertexArrayPointer;
+
 	switch(type)
 	{
 		case GL_SHORT:
-			pglState->vertexArrayPointer.type = GPU_SHORT;
-			pglState->vertexArrayPointer.stride = size * 2;
+			vertexArray->type = GPU_SHORT;
+			vertexArray->stride = size * 2;
 			break;
 		case GL_FLOAT:
-			pglState->vertexArrayPointer.type = GPU_FLOAT;
-			pglState->vertexArrayPointer.stride = size * 4;
+			vertexArray->type = GPU_FLOAT;
+			vertexArray->stride = size * 4;
 			break;
 		default:
 			printf("%s: unimplemented type: %i\n", __FUNCTION__, type);
@@ -70,33 +69,37 @@ void glVertexPointer(GLint size, GLenum type, GLsizei stride, const GLvoid * poi
 
 	if(stride)
 	{
-		pglState->vertexArrayPointer.padding = (stride - pglState->vertexArrayPointer.stride) / 4;
-		pglState->vertexArrayPointer.stride = stride;
+		vertexArray->padding = (stride - vertexArray->stride) / 4;
+		vertexArray->stride = stride;
 	}
 
-	pglState->vertexArrayPointer.pointer = pointer;
-	pglState->vertexArrayPointer.size = size;
+	vertexArray->pointer = pointer;
+	vertexArray->size = size;
+
+	vertexArray->bufferConfig = _configAttribBuffer( 0x0, vertexArray->stride, 1, vertexArray->padding);
 }
 
 void glColorPointer(GLint size, GLenum type, GLsizei stride, const GLvoid * pointer)
 {
+	AttribPointer *colorArray = &pglState->colorArrayPointer;
+
 	switch(type)
 	{
 		case GL_BYTE:
-			pglState->colorArrayPointer.type = GPU_BYTE;
-			pglState->colorArrayPointer.stride = size * 1;
+			colorArray->type = GPU_BYTE;
+			colorArray->stride = size * 1;
 			break;
 		case GL_UNSIGNED_BYTE:
-			pglState->colorArrayPointer.type = GPU_UNSIGNED_BYTE;
-			pglState->colorArrayPointer.stride = size * 1;
+			colorArray->type = GPU_UNSIGNED_BYTE;
+			colorArray->stride = size * 1;
 			break;
 		case GL_SHORT:
-			pglState->colorArrayPointer.type = GPU_SHORT;
-			pglState->colorArrayPointer.stride = size * 2;
+			colorArray->type = GPU_SHORT;
+			colorArray->stride = size * 2;
 			break;
 		case GL_FLOAT:
-			pglState->colorArrayPointer.type = GPU_FLOAT;
-			pglState->colorArrayPointer.stride = size * 4;
+			colorArray->type = GPU_FLOAT;
+			colorArray->stride = size * 4;
 			break;
 		default:
 			printf("%s: unimplemented type: %i\n", __FUNCTION__, type);
@@ -105,12 +108,14 @@ void glColorPointer(GLint size, GLenum type, GLsizei stride, const GLvoid * poin
 
 	if(stride)
 	{
-		pglState->colorArrayPointer.padding = (stride - pglState->colorArrayPointer.stride) / 4;
-		pglState->colorArrayPointer.stride  = stride;
+		colorArray->padding = (stride - pglState->colorArrayPointer.stride) / 4;
+		colorArray->stride  = stride;
 	}
 
-	pglState->colorArrayPointer.pointer = pointer;
-	pglState->colorArrayPointer.size = size;
+	colorArray->pointer = pointer;
+	colorArray->size = size;
+
+	colorArray->bufferConfig = _configAttribBuffer(0x1, colorArray->stride, 1, colorArray->padding);
 }
 
 void glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid* pointer)
@@ -140,6 +145,8 @@ void glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid* po
 
 	texCoordArray->pointer = pointer;
 	texCoordArray->size = size;
+
+	texCoordArray->bufferConfig = _configAttribBuffer(0x2 + pglState->texUnitActiveClient, texCoordArray->stride, 1, texCoordArray->padding);
 }
 
 void glEnableClientState(GLenum array)
@@ -208,16 +215,15 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 	void *arrayCache = NULL;
 
 	uint8_t  bufferCount 			= 0;
-	uint8_t  attributesCount		= 2;
 	uint16_t attributesFixedMask 	= 0x00;
 	uint64_t attributesFormat 		= 0x00;
-	uint64_t attributesPermutation  = 0x10;
+	uint64_t attributesPermutation  = 0x3210;
 
 	AttribPointer *vertexArray 	    = &pglState->vertexArrayPointer;
 	AttribPointer *colorArray 		= &pglState->colorArrayPointer;
 	AttribPointer *texCoordArray 	= pglState->texCoordArrayPointer;
 
-	if(_checkBufferLimit((end * 12 * sizeof(GLfloat)) + (sizeof(GLushort) * count)) == false)
+	if(_checkBufferLimit((end * 48) + (sizeof(GLushort) * count)) == false)
 		glFlush();
 
 	_stateFlush();
@@ -229,7 +235,7 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 	attributesFormat |= GPU_ATTRIBFMT(0, vertexArray->size, vertexArray->type);
 	_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
-	_configAttribBuffer(bufferCount, 0x0, vertexArray->stride, 1, vertexArray->padding);
+	_picaAttribBufferConfig(bufferCount, vertexArray->bufferConfig);
 
 	bufferCount++;
 
@@ -242,7 +248,7 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 		attributesFormat |= GPU_ATTRIBFMT(1, colorArray->size, colorArray->type);
 		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
-		_configAttribBuffer(bufferCount, 0x1, colorArray->stride, 1, colorArray->padding);
+		_picaAttribBufferConfig(bufferCount, colorArray->bufferConfig);
 
 		bufferCount++;
 	}
@@ -257,8 +263,6 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 	if( (pglState->texCoordArrayState[0] == GL_TRUE) && (pglState->texUnitState[0] == GL_TRUE) )
 	{
-		attributesPermutation |= 0x2 << (attributesCount * 4);
-
 		if(_addressIsLinear(texCoordArray[0].pointer))
 			arrayCache = (void*)texCoordArray[0].pointer;
 		else
@@ -266,9 +270,8 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 		attributesFormat |= GPU_ATTRIBFMT(2, texCoordArray[0].size, texCoordArray[0].type);
 		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
-		_configAttribBuffer(bufferCount, 0x2, texCoordArray[0].stride, 1, texCoordArray[0].padding);
+		_picaAttribBufferConfig(bufferCount, texCoordArray[0].bufferConfig);
 
-		attributesCount++;
 		bufferCount++;
 	}
 	else
@@ -278,20 +281,25 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 2);
 		_picaFixedAttribute(1, 1, 0, 0);
-		attributesCount++;
 	}
 
 	if( (pglState->texCoordArrayState[1] == GL_TRUE) && (pglState->texUnitState[1] == GL_TRUE) )
 	{	
-		attributesPermutation |= 0x3 << (attributesCount * 4);
 		arrayCache = _bufferArray(texCoordArray[1].pointer, texCoordArray[1].stride * end);
 		
 		attributesFormat |= GPU_ATTRIBFMT(3, texCoordArray[1].size, texCoordArray[1].type);
 		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
-		_configAttribBuffer(bufferCount, 0x3, texCoordArray[1].stride, 1, texCoordArray[1].padding);
+		_picaAttribBufferConfig(bufferCount, texCoordArray[1].bufferConfig);
 
-		attributesCount++;
 		bufferCount++;
+	}
+	else
+	{
+		attributesFixedMask |= 1 << 3;
+		attributesFormat |= GPU_ATTRIBFMT(3, 2, GPU_FLOAT);
+
+		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 3);
+		_picaFixedAttribute(1, 1, 0, 0);
 	}
 
 	_picaAttribBuffersFormat(attributesFormat, attributesFixedMask, attributesPermutation, bufferCount);

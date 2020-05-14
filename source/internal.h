@@ -62,6 +62,7 @@ typedef struct {
 	GLsizei stride;
 	GLsizei padding;
 	const GLvoid* pointer;
+	uint64_t bufferConfig;
 } AttribPointer;
 
 typedef struct {
@@ -178,7 +179,7 @@ void _stateDefault();
 void _picaAttribBuffersLocation(const void *location);
 void _picaAttribBuffersFormat(uint64_t format, uint16_t mask, uint64_t permutaion, uint8_t count);
 void _picaAttribBufferOffset(uint8_t id, uint32_t offset);
-void _picaAttribBufferConfig(uint8_t id, uint64_t format, uint8_t stride, uint8_t count, uint32_t padding);
+void _picaAttribBufferConfig(uint8_t id, uint64_t config);
 
 void _picaBlendFunction(GPU_BLENDEQUATION color_equation, GPU_BLENDEQUATION alpha_equation, GPU_BLENDFACTOR color_src, GPU_BLENDFACTOR color_dst, GPU_BLENDFACTOR alpha_src, GPU_BLENDFACTOR alpha_dst);
 
