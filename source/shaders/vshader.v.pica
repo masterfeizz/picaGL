@@ -4,9 +4,10 @@
 .fvec projection[4]
 
 ; Constants
-.constf myconst(0.0, 1.0, -1.0, -0.5)
+.constf myconst(0.0, 1.0, -1.0, 0.00392156862)
 .alias  zeros myconst.xxxx ; Vector full of zeros
 .alias  ones  myconst.yyyy ; Vector full of ones
+.alias  rgba8_to_float myconst.wwww
 
 ; Outputs
 .out outpos position
@@ -34,8 +35,13 @@
 	mov outtc0, intex
 	mov outtc1, intex2
 	
-	; outclr = solid white color
-	mov outclr, inclr
+	cmp inclr.w, gt, gt, r0.w
+
+	ifc cmp.x
+		mul outclr, rgba8_to_float, inclr
+	.else
+		mov outclr, inclr
+	.end
 
 	; We're finished
 	end
