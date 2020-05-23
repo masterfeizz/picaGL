@@ -108,17 +108,32 @@ static inline void _textureDataFree(TextureObject *texture)
 	texture->data = NULL;
 }
 
-static inline uint32_t _textureSwizzleCoord(int x, int y, int width)
+//Borrowed from citra
+static inline uint32_t _mortonInterleave(uint32_t x, uint32_t y)
 {
-	uint32_t pos = 	(x & 0x1) << 0 | ((x & 0x2) << 1) | ((x & 0x4) << 2) |
-					(y & 0x1) << 1 | ((y & 0x2) << 2) | ((y & 0x4) << 3);
+    static uint32_t xlut[] = {0x00, 0x01, 0x04, 0x05, 0x10, 0x11, 0x14, 0x15};
+    static uint32_t ylut[] = {0x00, 0x02, 0x08, 0x0a, 0x20, 0x22, 0x28, 0x2a};
 
-	return ((x >> 3) << 6) + ((y >> 3) * ((width >> 3) << 6)) + pos;
+    return xlut[x % 8] + ylut[y % 8];
+}
+
+#define BLOCK_HEIGHT 8
+
+static inline uint32_t _getMortonOffset(uint32_t x, uint32_t y)
+{
+	uint32_t coarse_x = x & ~7;
+
+	u32 i = _mortonInterleave(x, y);
+
+	uint32_t offset = coarse_x * BLOCK_HEIGHT;
+
+	return (i + offset);
 }
 
 static inline void _textureTile(TextureObject *texture, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, const uint32_t* data)
 {
-	uint32_t texel, offset;
+	uint32_t texel, offset, output_y, coarse_y;
+
 	void *tiled_output = texture->data;
 
 	if(texture->in_vram)
@@ -143,9 +158,13 @@ static inline void _textureTile(TextureObject *texture, GLint xoffset, GLint yof
 
 	for(int y = 0; y < height; y++)
 	{
+		output_y = texture->height - 1 - (y + yoffset);
+		coarse_y = output_y & ~7;
+
 		for(int x = 0; x < width; x++)
 		{
-			offset = _textureSwizzleCoord(x + xoffset, texture->height - 1 - (y + yoffset), texture->width);
+			offset = _getMortonOffset(x + xoffset, output_y) + coarse_y * texture->width;
+
 			texel = data[x + (y * width)];
 
 			if(texture->format == GPU_RGBA4)
