@@ -63,6 +63,7 @@ typedef struct {
 	GLsizei padding;
 	const GLvoid* pointer;
 	uint64_t bufferConfig;
+	bool inLinearMem;
 } AttribPointer;
 
 typedef struct {

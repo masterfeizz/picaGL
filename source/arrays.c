@@ -76,6 +76,7 @@ void glVertexPointer(GLint size, GLenum type, GLsizei stride, const GLvoid * poi
 	vertexArray->pointer = pointer;
 	vertexArray->size = size;
 
+	vertexArray->inLinearMem  = _addressIsLinear(pointer);
 	vertexArray->bufferConfig = _configAttribBuffer( 0x0, vertexArray->stride, 1, vertexArray->padding);
 }
 
@@ -115,6 +116,7 @@ void glColorPointer(GLint size, GLenum type, GLsizei stride, const GLvoid * poin
 	colorArray->pointer = pointer;
 	colorArray->size = size;
 
+	colorArray->inLinearMem  = _addressIsLinear(pointer);
 	colorArray->bufferConfig = _configAttribBuffer(0x1, colorArray->stride, 1, colorArray->padding);
 }
 
@@ -146,6 +148,7 @@ void glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid* po
 	texCoordArray->pointer = pointer;
 	texCoordArray->size = size;
 
+	texCoordArray->inLinearMem  = _addressIsLinear(pointer);
 	texCoordArray->bufferConfig = _configAttribBuffer(0x2 + pglState->texUnitActiveClient, texCoordArray->stride, 1, texCoordArray->padding);
 }
 
@@ -228,7 +231,7 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 	_stateFlush();
 
-	if(_addressIsLinear(vertexArray->pointer))
+	if(vertexArray->inLinearMem)
 		arrayCache = (void*)vertexArray->pointer;
 	else
 		arrayCache = _bufferArray(vertexArray->pointer, vertexArray->stride * end);
@@ -241,7 +244,7 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 	if(pglState->colorArrayState == GL_TRUE)
 	{
-		if(_addressIsLinear(colorArray->pointer))
+		if(colorArray->inLinearMem)
 			arrayCache = (void*)colorArray->pointer;
 		else
 			arrayCache = _bufferArray(colorArray->pointer, colorArray->stride * end);
@@ -263,7 +266,7 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 	if( (pglState->texCoordArrayState[0] == GL_TRUE) && (pglState->texUnitState[0] == GL_TRUE) )
 	{
-		if(_addressIsLinear(texCoordArray[0].pointer))
+		if(texCoordArray[0].inLinearMem)
 			arrayCache = (void*)texCoordArray[0].pointer;
 		else
 			arrayCache = _bufferArray(texCoordArray[0].pointer, texCoordArray[0].stride * end);
@@ -285,7 +288,10 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 	if( (pglState->texCoordArrayState[1] == GL_TRUE) && (pglState->texUnitState[1] == GL_TRUE) )
 	{	
-		arrayCache = _bufferArray(texCoordArray[1].pointer, texCoordArray[1].stride * end);
+		if(texCoordArray[0].inLinearMem)
+			arrayCache = (void*)texCoordArray[0].pointer;
+		else
+			arrayCache = _bufferArray(texCoordArray[0].pointer, texCoordArray[0].stride * end);
 		
 		attributesFormat |= GPU_ATTRIBFMT(3, texCoordArray[1].size, texCoordArray[1].type);
 		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
