@@ -10,7 +10,7 @@ extern "C" {
 void pglInit();
 void pglExit();
 void pglSwapBuffers();
-void pglSelectScreen(uint8_t display, uint8_t side);
+void pglSelectScreen(unsigned display, unsigned side);
 
 #ifdef __cplusplus
 }
