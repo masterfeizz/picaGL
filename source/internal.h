@@ -50,6 +50,7 @@ typedef struct {
 	uint16_t width, height;
 	uint32_t param;
 	uint32_t border;
+	uint8_t bpp;
 	void* data;
 	size_t size;
 	bool in_vram;
