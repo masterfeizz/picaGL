@@ -186,7 +186,7 @@ static inline void _textureTile(TextureObject *texture, GLint xoffset, GLint yof
 			offset = (_getMortonOffset(x + xoffset, output_y) + coarse_y * texture->width) * texture->bpp;
 			texel = readPixel(data + ((x + (y * width)) * bpp));
 
-			writePixel(texture->data + offset, texel);
+			writePixel(tiled_output + offset, texel);
 		}
 	}
 
