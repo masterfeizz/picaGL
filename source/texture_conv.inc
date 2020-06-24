@@ -28,6 +28,16 @@ uint32_t _readLA8(const void* data)
 	return (l | (l << 8) | (l << 16) | (a << 24));
 }
 
+uint32_t _readA8(const void* data)
+{
+	uint8_t  *clr = (uint8_t*)data;
+
+	uint8_t l = 255;
+	uint8_t a = clr[0];
+
+	return (l | (l << 8) | (l << 16) | (a << 24));
+}
+
 void _writeRGBA4(void *data, uint32_t color)
 {
 	uint16_t *dst = (uint16_t*)data;
@@ -73,4 +83,12 @@ void _writeLA8(void *data, uint32_t color)
 	uint8_t a = clr[3];
 
 	*dst = (a | (l << 8));
+}
+
+void _writeA8(void *data, uint32_t color)
+{
+	uint8_t *dst = (uint8_t*)data;
+	uint8_t *clr = (uint8_t*)&color;
+
+	*dst = clr[3];
 }

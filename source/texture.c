@@ -15,11 +15,15 @@ static size_t _determineBPP(GPU_TEXCOLOR format)
 	switch (format)
 	{
 		case GPU_RGBA8:  return 4;
+
 		case GPU_RGB8:   return 3;
+
 		case GPU_RGBA5551:
 		case GPU_RGB565:
 		case GPU_RGBA4:
 		case GPU_LA8:    return 2;
+
+		case GPU_A8:
 		case GPU_LA4:    return 1;
 
 		default:         return 4;
@@ -34,11 +38,13 @@ static GPU_TEXCOLOR _determineHardwareFormat(GLenum format)
 		case GL_RGBA8: //return GPU_RGBA8;
 		case GL_RGBA:
 		case GL_RGBA4: return GPU_RGBA4;
+
 		case 3:
 		case GL_RGB8:
 		case GL_RGB:
 		case GL_RGB5:  return GPU_RGB565;
 
+		case GL_ALPHA:
 		case GL_LUMINANCE_ALPHA: return GPU_LA4;
 
 		default: return GPU_RGBA4;
@@ -48,6 +54,11 @@ static GPU_TEXCOLOR _determineHardwareFormat(GLenum format)
 static inline readFunc _determineReadFunction(GLenum format, GLenum type, uint8_t *bpp)
 {
 	switch (format) {
+		case GL_ALPHA:
+			switch (type) {
+				case GL_UNSIGNED_BYTE: *bpp = 1; return _readA8;
+				default:               return NULL;
+			}
 		case GL_LUMINANCE_ALPHA:
 			switch (type) {
 				case GL_UNSIGNED_BYTE: *bpp = 2; return _readLA8;
@@ -75,6 +86,7 @@ static inline writeFunc _determineWriteFunction(GPU_TEXCOLOR format)
 		case GPU_RGB565: return _writeRGB565;
 		case GPU_LA8:    return _writeLA8;
 		case GPU_LA4:    return _writeLA4;
+		case GPU_A8:     return _writeA8;
 		default:         return NULL;
 	}
 }
