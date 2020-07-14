@@ -65,8 +65,6 @@ void pglSwapBuffers()
 
 	uint32_t *output_framebuffer = (uint32_t*)gfxGetFramebuffer(pglState->display, pglState->display_side, NULL, NULL);
 	uint8_t output_format = gfxGetScreenFormat(pglState->display);
-
-	gfxConfigScreen(pglState->display, false);
 	
 	if(pglState->display == GFX_TOP)
 	{
@@ -82,8 +80,10 @@ void pglSwapBuffers()
 			output_framebuffer, GX_BUFFER_DIM(240, 320),
 			GX_TRANSFER_OUT_FORMAT(output_format));
 	}
+	
+	_queueRun(false);
 
-	_queueRun(true);
+	gfxScreenSwapBuffers(pglState->display, false);
 }
 
 void pglSelectScreen(unsigned display, unsigned side)
