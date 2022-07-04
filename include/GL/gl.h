@@ -255,6 +255,7 @@ typedef double    GLclampd; /* double precision float in [0,1] */
 #define GL_PROJECTION_MATRIX      0x0BA7
 #define GL_RGBA_MODE        0x0C31
 #define GL_VIEWPORT       0x0BA2
+#define GL_LINE_WIDTH     0x0B21
 
 /* Hints */
 #define GL_FOG_HINT       0x0C54
@@ -265,6 +266,7 @@ typedef double    GLclampd; /* double precision float in [0,1] */
 #define GL_NICEST       0x1102
 
 /* Scissor box */
+#define GL_SCISSOR_BOX        0x0C10
 #define GL_SCISSOR_TEST       0x0C11
 
 /* Pixel Mode / Transfer */
@@ -370,6 +372,8 @@ typedef double    GLclampd; /* double precision float in [0,1] */
 /*
  * Miscellaneous
  */
+
+#define GL_LINE_SMOOTH                    0x0B20
 
 void glClearColor( GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha );
 void glClear( GLbitfield mask );

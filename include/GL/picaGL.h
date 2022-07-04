@@ -9,8 +9,9 @@ extern "C" {
 
 void pglInit();
 void pglExit();
-void pglSwapBuffers();
 void pglSelectScreen(unsigned display, unsigned side);
+void pglSwapBuffersEx(unsigned top, unsigned bot);
+void pglSwapBuffers();
 
 #ifdef __cplusplus
 }

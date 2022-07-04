@@ -41,21 +41,22 @@ static inline GPU_TESTFUNC pgl_convert_testfunc(GLenum func)
 
 void glAlphaFunc(GLenum func, GLclampf ref)
 {
-	pglState->alphaTestFunction = pgl_convert_testfunc(func);
-	pglState->alphaTestReference = (GLuint)(ref * 255.0f);
+	pgl_state.alpha_test.function = pgl_convert_testfunc(func);
+	pgl_state.alpha_test.reference = (GLuint)(ref * 255.0f);
 
-	pglState->changes |= STATE_ALPHATEST_CHANGE;
+	pgl_state.changes |= pglDirtyFlag_AlphaTest;
 }
 
 void glBlendColor(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha)
 { 
-	uint8_t r = red * 255;
-	uint8_t b = blue * 255;
+	uint8_t r = red   * 255;
+	uint8_t b = blue  * 255;
 	uint8_t g = green * 255;
 	uint8_t a = alpha * 255;
-	pglState->blendColor = r | (g << 8) | (b << 16) | (a << 24);
 
-	pglState->changes |= STATE_BLEND_CHANGE;
+	pgl_state.blend.color = r | (g << 8) | (b << 16) | (a << 24);
+
+	pgl_state.changes |= pglDirtyFlag_Blend;
 }
 
 void glBlendEquation(GLenum mode)
@@ -63,23 +64,23 @@ void glBlendEquation(GLenum mode)
 	switch(mode)
 	{
 		case GL_FUNC_SUBTRACT:
-			pglState->blendEquation = GPU_BLEND_SUBTRACT;
+			pgl_state.blend.alpha_eq = pgl_state.blend.rgb_eq = GPU_BLEND_SUBTRACT;
 			break;
 		case GL_FUNC_REVERSE_SUBTRACT:
-			pglState->blendEquation = GPU_BLEND_REVERSE_SUBTRACT;
+			pgl_state.blend.alpha_eq = pgl_state.blend.rgb_eq = GPU_BLEND_REVERSE_SUBTRACT;
 			break;
 		default:
-			pglState->blendEquation = GPU_BLEND_ADD;
+			pgl_state.blend.alpha_eq = pgl_state.blend.rgb_eq = GPU_BLEND_ADD;
 			break;
 	}
 
-	pglState->changes |= STATE_BLEND_CHANGE;
+	pgl_state.changes |= pglDirtyFlag_Blend;
 }
 
 void glBlendFunc(GLenum sfactor, GLenum dfactor)
 {
-	pglState->blendSrcFunction = pgl_convert_blendfactor(sfactor);
-	pglState->blendDstFunction = pgl_convert_blendfactor(dfactor);
+	pgl_state.blend.alpha_sfactor = pgl_state.blend.rgb_sfactor = pgl_convert_blendfactor(sfactor);
+	pgl_state.blend.alpha_dfactor = pgl_state.blend.rgb_dfactor = pgl_convert_blendfactor(dfactor);
 
-	pglState->changes |= STATE_BLEND_CHANGE;
+	pgl_state.changes |= pglDirtyFlag_Blend;
 }

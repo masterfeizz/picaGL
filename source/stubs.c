@@ -204,6 +204,9 @@ void glRectsv(const GLshort *v1, const GLshort *v2) {}
 void glRotated(GLdouble angle, GLdouble x, GLdouble y, GLdouble z) {}
 void glScaled(GLdouble x, GLdouble y, GLdouble z) {}
 void glSelectBuffer(GLsizei size, GLuint *buffer) {}
+void glStencilFunc(GLenum func, GLint ref, GLuint mask) {}
+void glStencilMask(GLuint mask) {}
+void glStencilOp(GLenum fail, GLenum zfail, GLenum zpass) {}
 void glTexCoord1d(GLdouble s) {}
 void glTexCoord1dv(const GLdouble *v) {}
 void glTexCoord1f(GLfloat s) {}
@@ -266,7 +269,6 @@ void glVertex4i(GLint x, GLint y, GLint z, GLint w) {}
 void glVertex4iv(const GLint *v) {}
 void glVertex4s(GLshort x, GLshort y, GLshort z, GLshort w) {}
 void glVertex4sv(const GLshort *v) {}
-void glGetFloatv(GLenum pname, GLfloat* data) {}
 void glCompressedTexImage3DARB(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLsizei imageSize, const void *data) {}
 void glCompressedTexImage2DARB(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border,  GLsizei imageSize, const void *data) {}
 void glTexSubImage3D( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const GLvoid *pixels ) {}
@@ -283,5 +285,4 @@ typedef int GLsizeiptrARB;
 void glBufferDataARB (GLenum target, GLsizeiptrARB size, const GLvoid *data, GLenum usage) {}
 void glBufferSubDataARB (GLenum target, GLintptrARB offset, GLsizeiptrARB size, const GLvoid *data) {}
 
-void glLockArraysEXT (GLint first, GLsizei count) {}
 void glUnlockArraysEXT (void) {}

@@ -17,7 +17,7 @@ include $(DEVKITARM)/3ds_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	picaGL
 BUILD		:=	build
-SOURCES		:=	source source/utils source/shaders
+SOURCES		:=	source source/shaders
 DATA		:=	data
 INCLUDES	:=	include
 
@@ -30,7 +30,7 @@ CFLAGS	:=	-O2 -Wall -Werror -mword-relocations \
 			-ffunction-sections -fdata-sections \
 			$(ARCH)
 
-CFLAGS	+=	$(INCLUDE) -DARM11 -D_3DS
+CFLAGS	+=	$(INCLUDE) -D__3DS__
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 

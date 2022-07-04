@@ -1,8 +1,14 @@
-#include "internal.h"
 
 #include <stdio.h>
 
-#include "texture_conv.inc"
+#include "internal.h"
+#include "texture_conv.h"
+
+#define MAX_TEXTURES 4096
+
+#define GPU_UNSUPPORTED 0xF
+
+static pgl_texture_t *textures[MAX_TEXTURES] = { NULL };
 
 static inline bool _addressIsVRAM(const void* addr)
 {
@@ -30,65 +36,31 @@ static size_t _determineBPP(GPU_TEXCOLOR format)
 	}
 }
 
-static GPU_TEXCOLOR _determineHardwareFormat(GLenum format)
+static GPU_TEXCOLOR _determineHardwareFormat(GLint internalFormat, GLenum format, GLenum type)
 {
 	switch(format)
 	{	
-		case 4:
-		case GL_RGBA8: //return GPU_RGBA8;
 		case GL_RGBA:
-		case GL_RGBA4: return GPU_RGBA4;
+			if(type == GL_UNSIGNED_BYTE && internalFormat == GL_RGB)
+			{
+				if(pgl_state.downsample_textures)
+					return GPU_RGB565;
+				else
+					return GPU_RGB8;
+			}
+			if(type == GL_UNSIGNED_BYTE)
+			{
+				if(pgl_state.downsample_textures)
+					return GPU_RGBA4;
+				else
+					return GPU_RGBA8;
+			}
+			break;
 
-		case 3:
-		case GL_RGB8:
-		case GL_RGB:
-		case GL_RGB5:  return GPU_RGB565;
-
-		case GL_ALPHA:
-		case GL_LUMINANCE_ALPHA: return GPU_LA4;
-
-		default: return GPU_RGBA4;
+		default: break;
 	}
-}
 
-static inline readFunc _determineReadFunction(GLenum format, GLenum type, uint8_t *bpp)
-{
-	switch (format) {
-		case GL_ALPHA:
-			switch (type) {
-				case GL_UNSIGNED_BYTE: *bpp = 1; return _readA8;
-				default:               return NULL;
-			}
-		case GL_LUMINANCE_ALPHA:
-			switch (type) {
-				case GL_UNSIGNED_BYTE: *bpp = 2; return _readLA8;
-				default:               return NULL;
-			}
-		case GL_RGB:
-			switch (type) {
-				case GL_UNSIGNED_BYTE: *bpp = 3; return _readRGB8;
-				default:               return NULL;
-			}
-		case GL_RGBA:
-			switch (type) {
-				case GL_UNSIGNED_BYTE: *bpp = 4; return _readRGBA8;
-				default:               return NULL;
-			}
-		default:
-			return NULL;
-	}
-}
-
-static inline writeFunc _determineWriteFunction(GPU_TEXCOLOR format)
-{
-	switch (format) {
-		case GPU_RGBA4:  return _writeRGBA4;
-		case GPU_RGB565: return _writeRGB565;
-		case GPU_LA8:    return _writeLA8;
-		case GPU_LA4:    return _writeLA4;
-		case GPU_A8:     return _writeA8;
-		default:         return NULL;
-	}
+	return GPU_UNSUPPORTED;
 }
 
 static inline uint32_t _picaConvertWrap(uint32_t param)
@@ -96,10 +68,11 @@ static inline uint32_t _picaConvertWrap(uint32_t param)
 	switch(param)
 	{
 		case GL_CLAMP:
-		case GL_CLAMP_TO_EDGE: return GPU_CLAMP_TO_EDGE;
-		case GL_REPEAT: return GPU_REPEAT;
+		case GL_CLAMP_TO_EDGE:   return GPU_CLAMP_TO_EDGE;
+		case GL_REPEAT:          return GPU_REPEAT;
 		case GL_MIRRORED_REPEAT: return GPU_MIRRORED_REPEAT;
-		default: return GPU_REPEAT;
+
+		default:                 return GPU_REPEAT;
 	}
 }
 
@@ -109,10 +82,9 @@ static inline uint32_t _picaConvertFilter(uint32_t param)
 	{	
 		case GL_LINEAR_MIPMAP_LINEAR:
 		case GL_LINEAR: return GPU_LINEAR;
-		
 		case GL_NEAREST_MIPMAP_NEAREST:
 		case GL_NEAREST: return GPU_NEAREST;
-
+		
 		default: return GL_LINEAR;
 	}
 }
@@ -121,7 +93,7 @@ static inline void *_textureDataAlloc(size_t size)
 {
 	void *ret = NULL;
 
-	if(size > 0x800)
+	if(size > 0x800 && size < SCRATCH_TEXTURE_SIZE)
 		ret = vramAlloc(size);
 
 	if(!ret)
@@ -130,7 +102,7 @@ static inline void *_textureDataAlloc(size_t size)
 	return ret;
 }
 
-static inline void _textureDataFree(TextureObject *texture)
+static inline void _textureDataFree(pgl_texture_t *texture)
 {
 	if(texture->in_vram)
 		vramFree(texture->data);
@@ -140,164 +112,106 @@ static inline void _textureDataFree(TextureObject *texture)
 	texture->data = NULL;
 }
 
-//Borrowed from citra
-static inline uint32_t _mortonInterleave(uint32_t x, uint32_t y)
+void glActiveTexture(GLenum texture)
 {
-    static uint32_t xlut[] = {0x00, 0x01, 0x04, 0x05, 0x10, 0x11, 0x14, 0x15};
-    static uint32_t ylut[] = {0x00, 0x02, 0x08, 0x0a, 0x20, 0x22, 0x28, 0x2a};
-
-    return xlut[x % 8] + ylut[y % 8];
+	pgl_state.texunit_active = texture & 0x01;
 }
 
-#define BLOCK_HEIGHT 8
-
-static inline uint32_t _getMortonOffset(uint32_t x, uint32_t y)
+void glClientActiveTexture( GLenum texture )
 {
-	uint32_t coarse_x = x & ~7;
-
-	u32 i = _mortonInterleave(x, y);
-
-	uint32_t offset = coarse_x * BLOCK_HEIGHT;
-
-	return (i + offset);
+	pgl_state.texunit_active_client = texture & 0x01;
 }
 
-static inline void _textureTile(TextureObject *texture, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, const void* data, uint8_t bpp, readFunc readPixel, writeFunc writePixel)
+void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid* data)
 {
-	uint32_t texel, offset, output_y, coarse_y;
+	if(level != 0 || target != GL_TEXTURE_2D) return;
+
+	if(internalFormat == 3) internalFormat = GL_RGB;
+	if(internalFormat == 4) internalFormat = GL_RGBA;
+
+	pgl_texture_t *texture = pgl_state.texture_bound[pgl_state.texunit_active];
+
+	if(texture->data)
+		_textureDataFree(texture);
+
+	internalFormat = _determineHardwareFormat(internalFormat, format, type);
+
+	if(internalFormat == GPU_UNSUPPORTED) exit(1);
+
+	texture->format = internalFormat;
+	texture->bpp 	= _determineBPP(texture->format);
+	texture->width  = width;
+	texture->height = height;
+	texture->data   = _textureDataAlloc(width * height * texture->bpp);
+	texture->max_level = 0;
+
+	if(texture->data == NULL)
+		return;
+
+	texture->in_vram = _addressIsVRAM(texture->data);
+
+	pgl_state.changes |= pglDirtyFlag_Texture;
+
+	if(!data) return;
+
+	tile_func_t texture_tile = pgl_get_tile_func(texture->format, format, type);
+
+	if(texture_tile == NULL) return;
 
 	void *tiled_output = texture->data;
 
 	if(texture->in_vram)
 	{
-		tiled_output = linearAlloc(texture->width * texture->height * texture->bpp);
-
-		if(!tiled_output)
-			return;
-
-		if(xoffset || yoffset)
-		{
-			_queueWaitAndClear();
-			GX_TextureCopy(texture->data, 0, tiled_output, 0, texture->width * texture->height * texture->bpp, 8);
-			_queueRun(false);
-			
-			_textureDataFree(texture);
-
-			texture->data = tiled_output;
-			texture->in_vram = false;
-		}
+		pgl_queue_wait(true);
+		tiled_output = pgl_state.scratch_texture;
 	}
 
-	for(int y = 0; y < height; y++)
-	{
-		output_y = texture->height - 1 - (y + yoffset);
-		coarse_y = output_y & ~7;
-
-		for(int x = 0; x < width; x++)
-		{
-			offset = (_getMortonOffset(x + xoffset, output_y) + coarse_y * texture->width) * texture->bpp;
-			texel = readPixel(data + ((x + (y * width)) * bpp));
-
-			writePixel(tiled_output + offset, texel);
-		}
-	}
+	texture_tile(data, tiled_output, 0, 0, width, height, width, height - 1);
 
 	GSPGPU_FlushDataCache(tiled_output, texture->width * texture->height * texture->bpp);
 
 	if(texture->in_vram)
-	{
-		_queueWaitAndClear();
 		GX_TextureCopy(tiled_output, 0, texture->data, 0, texture->width * texture->height * texture->bpp, 8);
-		_queueRun(false);
-		
-		linearFree(tiled_output);
-	}
-}
-
-void glActiveTexture(GLenum texture)
-{
-	uint8_t texunit = texture & 0x01;
-
-	if(texunit > 1)
-		texunit = 0;
-
-	pglState->texUnitActive = texunit;
-}
-
-void glClientActiveTexture( GLenum texture )
-{
-	uint8_t texunit = texture & 0x01;
-
-	if(texunit > 1)
-		texunit = 0;
-
-	pglState->texUnitActiveClient = texunit;
-}
-
-void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid* data)
-{
-	if(level != 0 || target != GL_TEXTURE_2D)
-		return;
-
-	TextureObject *texture = pglState->textureBound[pglState->texUnitActive];
-	texture->used = true;
-
-	if(texture->data)
-		_textureDataFree(texture);
-
-	texture->format = _determineHardwareFormat(internalFormat);
-	texture->bpp 	= _determineBPP(texture->format);
-	texture->width  = width;
-	texture->height = height;
-	texture->data   = _textureDataAlloc(width * height * texture->bpp);
-
-	if(texture->data == NULL)
-		return;
-
-	if(_addressIsVRAM(texture->data))
-		texture->in_vram = true;
-	else
-		texture->in_vram = false;
-
-	pglState->textureChanged = GL_TRUE;
-	pglState->changes |= STATE_TEXTURE_CHANGE;
-
-	if(!data) return;
-
-	uint8_t offset_bpp = 0;
-
-	readFunc readPixel   = _determineReadFunction(format, type, &offset_bpp);
-	writeFunc writePixel = _determineWriteFunction(texture->format);
-
-	if(readPixel && writePixel && data)
-		_textureTile(texture, 0, 0, width, height, data, offset_bpp, readPixel, writePixel);
 }
 
 void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid* data)
 {
-	if(level != 0 || target != GL_TEXTURE_2D || data == NULL)
-		return;
+	if(level != 0 || target != GL_TEXTURE_2D || data == NULL) return;
 
-	TextureObject *texture = pglState->textureBound[pglState->texUnitActive];
+	pgl_texture_t *texture = pgl_state.texture_bound[pgl_state.texunit_active];
 
-	if(texture->data == NULL)
-		return;
+	if(texture->data == NULL) return;
 
-	uint8_t offset_bpp = 0;
+	tile_func_t texture_tile = pgl_get_tile_func(texture->format, format, type);
 
-	readFunc readPixel   = _determineReadFunction(format, type, &offset_bpp);
-	writeFunc writePixel = _determineWriteFunction(texture->format);
+	if(texture_tile == NULL) return;
 
-	if(readPixel && writePixel)
-		_textureTile(texture, xoffset, yoffset, width, height, data, offset_bpp, readPixel, writePixel);
+	// Move textures out of vram if necessary
+	if(texture->in_vram)
+	{
+		void *new_data = linearAlloc(texture->width * texture->height * texture->bpp);
 
-	pglState->textureChanged = GL_TRUE;
-	pglState->changes |= STATE_TEXTURE_CHANGE;
+		if(!new_data) return;
+
+		GX_TextureCopy(texture->data, 0, new_data, 0, texture->width * texture->height * texture->bpp, 8);
+		pgl_queue_wait(true);
+
+		_textureDataFree(texture);
+
+		texture->data = new_data;
+		texture->in_vram = false;
+	}
+
+	texture_tile(data, texture->data, xoffset, yoffset, width, height, texture->width, texture->height - 1);
+
+	GSPGPU_FlushDataCache(texture->data, texture->width * texture->height * texture->bpp);
+
+	pgl_state.changes |= pglDirtyFlag_Texture;
 }
 
 void glTexParameterf(GLenum target, GLenum pname, GLfloat param)
 {
-	TextureObject *texture = pglState->textureBound[pglState->texUnitActive];
+	pgl_texture_t *texture = pgl_state.texture_bound[pgl_state.texunit_active];
 
 	uint32_t tex_param = texture->param;
 
@@ -321,7 +235,7 @@ void glTexParameterf(GLenum target, GLenum pname, GLfloat param)
 
 	texture->param = tex_param;
 
-	pglState->changes |= STATE_TEXTURE_CHANGE;
+	pgl_state.changes |= pglDirtyFlag_Texture;
 }
 
 void glTexParameteri(GLenum target, GLenum pname, GLint param)
@@ -332,68 +246,64 @@ void glTexParameteri(GLenum target, GLenum pname, GLint param)
 
 void glBindTexture(GLenum target, GLuint texture)
 {
-	TextureObject *texObject;
+	pgl_texture_t *tex;
 
-	texObject = hashTableGet(&pglState->textureTable, texture);
+	tex = textures[texture];
 
-	if(texObject == NULL)
+	if(tex == NULL)
 	{
-		texObject = malloc(sizeof(TextureObject));
-
-		texObject->param  = GPU_TEXTURE_MAG_FILTER(GPU_LINEAR) | GPU_TEXTURE_WRAP_S(GPU_REPEAT) | GPU_TEXTURE_WRAP_T(GPU_REPEAT);
-		texObject->width  = 0;
-		texObject->height = 0;
-
-		texObject->format = 0;
-		texObject->data   = NULL;
+		tex = calloc(1, sizeof(pgl_texture_t));
+		tex->param  = GPU_TEXTURE_MAG_FILTER(GPU_LINEAR) | GPU_TEXTURE_WRAP_S(GPU_REPEAT) | GPU_TEXTURE_WRAP_T(GPU_REPEAT);
 		
-		hashTableInsert(&pglState->textureTable, texture, texObject);
+		textures[texture] = tex;
 	}
 
-	if(pglState->textureBound[pglState->texUnitActive] == texObject)
+	if(pgl_state.texture_bound[pgl_state.texunit_active] == tex)
 		return;
 
-	pglState->textureBound[pglState->texUnitActive] = texObject;
+	pgl_state.texture_bound[pgl_state.texunit_active] = tex;
 
-	pglState->textureChanged = GL_TRUE;
-	pglState->changes |= STATE_TEXTURE_CHANGE;
+	pgl_state.changes |= pglDirtyFlag_Texture;
 }
 
-void glGenTextures(GLsizei n, GLuint *textures)
+void glGenTextures(GLsizei n, GLuint *texture)
 {
-	TextureObject *texObject;
-	int id;
+	pgl_texture_t *texObject;
+
 	for(int i = 0; i < n; i++)
 	{
-		id = hashTableUniqueKey(&pglState->textureTable);
-		texObject = malloc(sizeof(TextureObject));
+		for(int j = 0; j < MAX_TEXTURES; j++)
+		{
+			if(textures[j] == NULL)
+			{
+				texObject = calloc(1, sizeof(pgl_texture_t));
+				texObject->param  = GPU_TEXTURE_MAG_FILTER(GPU_LINEAR) | GPU_TEXTURE_WRAP_S(GPU_REPEAT) | GPU_TEXTURE_WRAP_T(GPU_REPEAT);
 
-		texObject->param  = GPU_TEXTURE_MAG_FILTER(GPU_LINEAR) | GPU_TEXTURE_WRAP_S(GPU_REPEAT) | GPU_TEXTURE_WRAP_T(GPU_REPEAT);
-		texObject->width  = 0;
-		texObject->height = 0;
+				textures[j] = texObject;
 
-		texObject->format = 0;
-		texObject->data   = NULL;
+				texture[i] = j;
 
-		hashTableInsert(&pglState->textureTable, id, texObject);
-
-		textures[i] = id;
+				break;
+			}
+		}
 	}
 }
 
-void glDeleteTextures(GLsizei n, const GLuint *textures)
+void glDeleteTextures(GLsizei n, const GLuint *texture)
 {
 	for(int i = 0; i < n; i++)
 	{
-		TextureObject *texObject = hashTableRemove(&pglState->textureTable, textures[i]);
+		pgl_texture_t *texObject = textures[ texture[i] ];
 
-		if(!texObject)
+		if(texObject == NULL)
 			continue;
 
 		if(texObject->data)
 			_textureDataFree(texObject);
 
 		free(texObject);
+
+		textures[ texture[i] ] = NULL;
 	}
 }
 
@@ -402,7 +312,7 @@ GLboolean glIsTexture( GLuint texture )
 	if(texture == 0)
 		return GL_FALSE;
 
-	TextureObject *texObject = hashTableGet(&pglState->textureTable, texture);
+	pgl_texture_t *texObject = textures[ texture ];
 
 	if(texObject)
 		return GL_TRUE;
@@ -415,92 +325,39 @@ void glTexImage1D(GLenum target, GLint level, GLint internalformat, GLsizei widt
 	glTexImage2D( GL_TEXTURE_2D, level, internalformat, width, 1, border, format, type, pixels );
 }
 
-void glTexEnvfv( GLenum target, GLenum pname, const GLfloat *params )
+void glGenerateMipmap(GLenum target)
 {
-	if ((target != GL_TEXTURE_ENV) || (pname != GL_TEXTURE_ENV_COLOR))
-		return;
+	if(target != GL_TEXTURE_2D) return;
 
-	uint8_t texunit = pglState->texUnitActive;
-	TextureEnv *texenv  = &pglState->texenv[texunit];
+	pgl_texture_t *texture = pgl_state.texture_bound[pgl_state.texunit_active];
 
-	uint8_t r = (uint8_t)(params[0] * 255);
-	uint8_t g = (uint8_t)(params[1] * 255);
-	uint8_t b = (uint8_t)(params[2] * 255);
-	uint8_t a = (uint8_t)(params[3] * 255);
+	if(texture->data == NULL) return;
+	if(texture->width < 128 || texture->height < 128) return;
 
-	texenv->color = r | (g << 8) | (b << 16) | (a << 24);
-	
-	pglState->changes |= STATE_TEXTURE_CHANGE;
-}
+	void *new_data = _textureDataAlloc(texture->width * texture->height * texture->bpp * 2);
 
-inline void glTexEnvi (GLenum target, GLenum pname, GLint param)
-{
-	if ((target != GL_TEXTURE_ENV) || (pname != GL_TEXTURE_ENV_MODE))
-		return;
-	
-	uint8_t texunit = pglState->texUnitActive;
-	TextureEnv *texenv  = &pglState->texenv[texunit];
+	if(!new_data) return;
 
-	switch (param)
-	{
-	case GL_ADD:
-		texenv->func_rgb = GPU_ADD;
-		texenv->src_rgb  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
-		texenv->op_rgb   = GPU_TEVOPERANDS(0, 0, 0);
+	uint32_t transfer_flags = GX_TRANSFER_IN_FORMAT(texture->format) | GX_TRANSFER_OUT_FORMAT(texture->format) |
+							  GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_XY) | BIT(5);
 
-		texenv->func_alpha = GPU_MODULATE;
-		texenv->src_alpha  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
-		texenv->op_alpha   = GPU_TEVOPERANDS(0, 0, 0);
-		break;
+	uint32_t dimension = GX_BUFFER_DIM(texture->height, texture->width);
 
-	case GL_REPLACE:
-		texenv->func_rgb = GPU_REPLACE;
-		texenv->src_rgb  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, 0, 0);
-		texenv->op_rgb   = GPU_TEVOPERANDS(0, 0, 0);
+	GX_TextureCopy(texture->data, 0, new_data, 0, texture->width * texture->height * texture->bpp, 8);
 
-		texenv->func_alpha = GPU_REPLACE;
-		texenv->src_alpha  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, 0, 0);
-		texenv->op_alpha   = GPU_TEVOPERANDS(0, 0, 0);
-		break;
+	GX_DisplayTransfer( (uint32_t*)texture->data, dimension,
+						(uint32_t*)(new_data + (texture->width * texture->height * texture->bpp)), dimension,
+						transfer_flags);
 
-	case GL_MODULATE:
-		texenv->func_rgb = GPU_MODULATE;
-		texenv->src_rgb  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
-		texenv->op_rgb   = GPU_TEVOPERANDS(0, 0, 0);
+	pgl_queue_wait(true);
 
-		texenv->func_alpha = GPU_MODULATE;
-		texenv->src_alpha  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
-		texenv->op_alpha   = GPU_TEVOPERANDS(0, 0, 0);
-		break;
+	_textureDataFree(texture);
 
-	case GL_DECAL:
-		texenv->func_rgb = GPU_INTERPOLATE;
-		texenv->src_rgb  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, GPU_TEXTURE0 + texunit);
-		texenv->op_rgb   = GPU_TEVOPERANDS(0, 0, GPU_TEVOP_RGB_SRC_ALPHA);
+	texture->data = new_data;
+	texture->in_vram = _addressIsVRAM(texture->data);
+	texture->max_level = 1;
 
-		texenv->func_alpha = GPU_REPLACE;
-		texenv->src_alpha  = GPU_TEVSOURCES(GPU_PRIMARY_COLOR, 0, 0);
-		texenv->op_alpha   = GPU_TEVOPERANDS(0, 0, 0);
-		break;
+	GSPGPU_FlushDataCache(texture->data, texture->width * texture->height * texture->bpp * 2);
 
-	case GL_BLEND:
-		texenv->func_rgb = GPU_INTERPOLATE;
-		texenv->src_rgb  = GPU_TEVSOURCES(GPU_CONSTANT, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS,  GPU_TEXTURE0 + texunit);
-		texenv->op_rgb   = GPU_TEVOPERANDS(0, 0, 0);
-
-		texenv->func_alpha = GPU_MODULATE;
-		texenv->src_alpha  = GPU_TEVSOURCES(GPU_TEXTURE0 + texunit, texunit == 0 ? GPU_PRIMARY_COLOR : GPU_PREVIOUS, 0);
-		texenv->op_alpha   = GPU_TEVOPERANDS(0, 0, 0);
-		break;
-
-	default:
-		break;
-	}
-
-	pglState->changes |= STATE_TEXTURE_CHANGE;
-}
-
-void glTexEnvf (GLenum target, GLenum pname, GLfloat param)
-{
-	glTexEnvi (target, pname, (int)param);
+	pgl_state.changes |= pglDirtyFlag_Texture;
 }

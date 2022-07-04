@@ -18,35 +18,35 @@ static inline GPU_TESTFUNC pgl_convert_testfunc(GLenum func)
 void glClearDepth(GLclampd depth)
 {
 	//I don't think this is right...
-	pglState->clearDepth = -depth;
+	pgl_state.clear_depth = (float)-depth;
 }
 
 void glDepthFunc(GLenum func)
 {
-	pglState->depthTestFunction = pgl_convert_testfunc(func);
+	pgl_state.depth_test.function = pgl_convert_testfunc(func);
 
-	pglState->changes |= STATE_DEPTHTEST_CHANGE;
+	pgl_state.changes |= pglDirtyFlag_DepthTest;
 }
 
 void glDepthMask(GLboolean flag)
 {
-	pglState->writeMask = (pglState->writeMask & 0xF) | ((flag & 0x1) << 4);
+	pgl_state.depth_test.write_mask = (pgl_state.depth_test.write_mask & 0xF) | ((flag & 0x1) << 4);
 
-	pglState->changes |= STATE_DEPTHTEST_CHANGE;
+	pgl_state.changes |= pglDirtyFlag_DepthTest;
 }
 
 void glDepthRange(GLclampd nearVal, GLclampd farVal)
 {
-	pglState->depthmapNear = (float)farVal;
-	pglState->depthmapFar  = (float)nearVal;
+	pgl_state.depthmap.near = (float)farVal;
+	pgl_state.depthmap.far  = (float)nearVal;
 
-	pglState->changes |= STATE_DEPTHMAP_CHANGE;
+	pgl_state.changes |= pglDirtyFlag_DepthMap;
 }
 
 void glPolygonOffset(GLfloat factor, GLfloat units) 
 {
 	//Not correct, but seems to do it for my needs
-	pglState->polygonOffset = units / (1 << 10);
+	pgl_state.depthmap.offset = units / (1 << 12);
 
-	pglState->changes |= STATE_DEPTHMAP_CHANGE;
+	pgl_state.changes |= pglDirtyFlag_DepthMap;
 }

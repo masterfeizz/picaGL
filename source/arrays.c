@@ -1,12 +1,34 @@
 #include "internal.h"
 
-static inline bool _addressIsLinear(const void* addr)
+static uint64_t attribs_format[2]  = { 0, 0 };
+
+static inline bool pgl_address_in_linear(const void* addr)
 {
 	u32 vaddr = (u32)addr;
-	return vaddr >= __ctru_linear_heap && vaddr < (__ctru_linear_heap + __ctru_linear_heap_size);
+	return (vaddr >= __ctru_linear_heap) && (vaddr < (__ctru_linear_heap + __ctru_linear_heap_size));
 }
 
-static uint64_t _configAttribBuffer(uint64_t format, uint8_t stride, uint8_t count, uint32_t padding)
+//Check if we have enough space in the vertex cache
+static bool pgl_check_cache_limit(size_t size)
+{
+	if(pgl_state.vertex_cache_pos + size > VERTEX_BUFFER_SIZE)
+		return false;
+	else
+		return true;
+}
+
+static void* pgl_cache_data(const void *data, size_t size)
+{
+	void *cache = pgl_state.vertex_cache + pgl_state.vertex_cache_pos;
+
+	if(data != NULL) memcpy(cache, data, size);
+
+	pgl_state.vertex_cache_pos += (size + 3) & ~3;
+
+	return cache;
+}
+
+static uint64_t pgl_config_attr_buffer(uint64_t format, uint8_t stride, uint8_t count, uint32_t padding)
 {
 	uint32_t *config = (uint32_t*)&format;
 
@@ -27,129 +49,78 @@ static uint64_t _configAttribBuffer(uint64_t format, uint8_t stride, uint8_t cou
 	return format;
 }
 
-//Check if we have enough space in the current geometry buffer
-static bool _checkBufferLimit(GLsizei size)
+static void pgl_config_attribute(GLint id, GLint size, GLenum type, GLsizei stride, const GLvoid * pointer)
 {
-	if(pglState->geometryBufferOffset + size > GEOMETRY_BUFFER_SIZE)
-		return false;
-	else
-		return true;
-}
-
-static void* _bufferArray(const void *data, GLsizei size)
-{
-	void *cache = pglState->geometryBuffer[pglState->geometryBufferCurrent] + pglState->geometryBufferOffset;
-
-	if(data != NULL)
-		memcpy(cache, data, size);
-
-	pglState->geometryBufferOffset += size;
-
-	return cache;
-}
-
-void glVertexPointer(GLint size, GLenum type, GLsizei stride, const GLvoid * pointer)
-{
-	AttribPointer *vertexArray = &pglState->vertexArrayPointer;
-
-	switch(type)
-	{
-		case GL_SHORT:
-			vertexArray->type = GPU_SHORT;
-			vertexArray->stride = size * 2;
-			break;
-		case GL_FLOAT:
-			vertexArray->type = GPU_FLOAT;
-			vertexArray->stride = size * 4;
-			break;
-		default:
-			printf("%s: unimplemented type: %i\n", __FUNCTION__, type);
-			break;
-	}
-
-	if(stride)
-	{
-		vertexArray->padding = (stride - vertexArray->stride) / 4;
-		vertexArray->stride = stride;
-	}
-
-	vertexArray->pointer = pointer;
-	vertexArray->size = size;
-
-	vertexArray->inLinearMem  = _addressIsLinear(pointer);
-	vertexArray->bufferConfig = _configAttribBuffer( 0x0, vertexArray->stride, 1, vertexArray->padding);
-}
-
-void glColorPointer(GLint size, GLenum type, GLsizei stride, const GLvoid * pointer)
-{
-	AttribPointer *colorArray = &pglState->colorArrayPointer;
+	pgl_attrib_info_t *attrib = &pgl_state.vertex_attrib[id];
 
 	switch(type)
 	{
 		case GL_BYTE:
-			colorArray->type = GPU_BYTE;
-			colorArray->stride = size * 1;
+			attrib->type = GPU_BYTE;
+			attrib->stride = size * 1;
 			break;
 		case GL_UNSIGNED_BYTE:
-			colorArray->type = GPU_UNSIGNED_BYTE;
-			colorArray->stride = size * 1;
+			attrib->type = GPU_UNSIGNED_BYTE;
+			attrib->stride = size * 1;
 			break;
 		case GL_SHORT:
-			colorArray->type = GPU_SHORT;
-			colorArray->stride = size * 2;
+			attrib->type = GPU_SHORT;
+			attrib->stride = size * 2;
 			break;
 		case GL_FLOAT:
-			colorArray->type = GPU_FLOAT;
-			colorArray->stride = size * 4;
+			attrib->type = GPU_FLOAT;
+			attrib->stride = size * 4;
 			break;
-		default:
-			printf("%s: unimplemented type: %i\n", __FUNCTION__, type);
-			return;
 	}
 
 	if(stride)
 	{
-		colorArray->padding = (stride - pglState->colorArrayPointer.stride) / 4;
-		colorArray->stride  = stride;
+		attrib->padding = (stride - attrib->stride) / 4;
+		attrib->stride  = stride;
+	}
+	else
+		attrib->padding = 0;
+
+	attrib->pointer = pointer;
+	attrib->size = size;
+
+	if( pgl_address_in_linear(pointer) )
+	{
+		attrib->cached_pointer = pointer;
+		attrib->cached_len = 0xFFFFFFFF;
+	}
+	else
+	{
+		attrib->cached_pointer = 0;
+		attrib->cached_len = 0;
 	}
 
-	colorArray->pointer = pointer;
-	colorArray->size = size;
+	attrib->buffer_config = pgl_config_attr_buffer(id, attrib->stride, 1, attrib->padding);
 
-	colorArray->inLinearMem  = _addressIsLinear(pointer);
-	colorArray->bufferConfig = _configAttribBuffer(0x1, colorArray->stride, 1, colorArray->padding);
+	attribs_format[0] &= ~(0xF << (id * 4));
+	attribs_format[0] |= GPU_ATTRIBFMT(id, attrib->size, attrib->type);
+}
+
+void glVertexPointer(GLint size, GLenum type, GLsizei stride, const GLvoid * pointer)
+{
+	if( (type != GL_SHORT) && (type != GL_FLOAT) ) return;
+
+	pgl_config_attribute(0, size, type, stride, pointer);
+}
+
+void glColorPointer(GLint size, GLenum type, GLsizei stride, const GLvoid * pointer)
+{
+	if( (type != GL_SHORT) && (type != GL_FLOAT) && (type != GL_UNSIGNED_BYTE) && (type != GL_BYTE) ) return;
+
+	pgl_config_attribute(1, size, type, stride, pointer);
+
 }
 
 void glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid* pointer)
 {
-	AttribPointer *texCoordArray = &pglState->texCoordArrayPointer[pglState->texUnitActiveClient];
+	if( (type != GL_SHORT) && (type != GL_FLOAT) ) return;
 
-	switch(type)
-	{
-		case GL_SHORT:
-			texCoordArray->type = GPU_SHORT;
-			texCoordArray->stride = size * 2;
-			break;
-		case GL_FLOAT:
-			texCoordArray->type = GPU_FLOAT;
-			texCoordArray->stride = size * 4;
-			break;
-		default:
-			printf("%s: unimplemented type: %i\n", __FUNCTION__, type);
-			return;
-	}
-
-	if(stride)
-	{
-		texCoordArray->padding = (stride - texCoordArray->stride) / 4;
-		texCoordArray->stride = stride;
-	}
-
-	texCoordArray->pointer = pointer;
-	texCoordArray->size = size;
-
-	texCoordArray->inLinearMem  = _addressIsLinear(pointer);
-	texCoordArray->bufferConfig = _configAttribBuffer(0x2 + pglState->texUnitActiveClient, texCoordArray->stride, 1, texCoordArray->padding);
+	pgl_config_attribute(2 + pgl_state.texunit_active_client, size, type, stride, pointer);
 }
 
 void glEnableClientState(GLenum array)
@@ -157,13 +128,16 @@ void glEnableClientState(GLenum array)
 	switch(array)
 	{
 		case GL_VERTEX_ARRAY:
-			pglState->vertexArrayState = GL_TRUE;
+			attribs_format[1] &= ~( 1 << 16 );
+			pgl_state.vertex_attrib[0].enabled = GL_TRUE;
 			break;
 		case GL_COLOR_ARRAY:
-			pglState->colorArrayState = GL_TRUE;
+			attribs_format[1] &= ~( 1 << 17 );
+			pgl_state.vertex_attrib[1].enabled = GL_TRUE;
 			break;
 		case GL_TEXTURE_COORD_ARRAY:
-			pglState->texCoordArrayState[pglState->texUnitActive] = GL_TRUE;
+			attribs_format[1] &= ~( 1 << (18 + pgl_state.texunit_active_client) );
+			pgl_state.vertex_attrib[2 + pgl_state.texunit_active_client].enabled = GL_TRUE;
 			break;
 	}
 }
@@ -173,20 +147,23 @@ void glDisableClientState(GLenum array)
 	switch(array)
 	{
 		case GL_VERTEX_ARRAY:
-			pglState->vertexArrayState = GL_FALSE;
+			attribs_format[1] |= 1 << 16;
+			pgl_state.vertex_attrib[0].enabled = GL_FALSE;
 			break;
 		case GL_COLOR_ARRAY:
-			pglState->colorArrayState = GL_FALSE;
+			attribs_format[1] |= 1 << 17;
+			pgl_state.vertex_attrib[1].enabled = GL_FALSE;
 			break;
 		case GL_TEXTURE_COORD_ARRAY:
-			pglState->texCoordArrayState[pglState->texUnitActive] = GL_FALSE;
+			attribs_format[1] |= 1 << (18 + pgl_state.texunit_active_client);
+			pgl_state.vertex_attrib[2 + pgl_state.texunit_active_client].enabled = GL_FALSE;
 			break;
 	}
 }
 
 void glDrawArrays(GLenum mode, GLint first, GLsizei count)
 {
-	if(pglState->vertexArrayState == GL_FALSE)
+	if(pgl_state.vertex_attrib[0].enabled == GL_FALSE)
 		return;
 
 	glDrawRangeElements(mode, first, count, count, GL_UNSIGNED_SHORT, NULL);
@@ -194,7 +171,10 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count)
 
 void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices)
 {
-	if(type != GL_UNSIGNED_SHORT || pglState->vertexArrayState == GL_FALSE)
+	if(pgl_state.vertex_attrib[0].enabled == false)
+		return;
+
+	if(type != GL_UNSIGNED_SHORT || pgl_state.vertex_attrib[0].enabled == GL_FALSE)
 		return;
 
 	uint32_t end = 0;
@@ -205,110 +185,73 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indic
 				end = ((GLushort*)indices)[i];
 	}
 
-	end++;
-
-	glDrawRangeElements( mode, 0, end, count, type, indices );
+	glDrawRangeElements( mode, 0, end + 1, count, type, indices );
 }
 
 void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices )
 {
-	if(type != GL_UNSIGNED_SHORT || pglState->vertexArrayState == GL_FALSE)
+	static const uint32_t attribs_permutation  = 0x3210;
+
+	if(pgl_state.vertex_attrib[0].enabled == false)
 		return;
 
-	void *arrayCache = NULL;
+	if(type != GL_UNSIGNED_SHORT || pgl_state.vertex_attrib[0].enabled == GL_FALSE)
+		return;
 
-	uint8_t  bufferCount 			= 0;
-	uint16_t attributesFixedMask 	= 0x00;
-	uint64_t attributesFormat 		= 0x00;
-	uint64_t attributesPermutation  = 0x3210;
+	size_t cached_vertex_size = 0;
 
-	AttribPointer *vertexArray 	    = &pglState->vertexArrayPointer;
-	AttribPointer *colorArray 		= &pglState->colorArrayPointer;
-	AttribPointer *texCoordArray 	= pglState->texCoordArrayPointer;
-
-	if(_checkBufferLimit((end * 48) + (sizeof(GLushort) * count)) == false)
-		glFlush();
-
-	_stateFlush();
-
-	if(vertexArray->inLinearMem)
-		arrayCache = (void*)vertexArray->pointer;
-	else
-		arrayCache = _bufferArray(vertexArray->pointer, vertexArray->stride * end);
-
-	attributesFormat |= GPU_ATTRIBFMT(0, vertexArray->size, vertexArray->type);
-	_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
-	_picaAttribBufferConfig(bufferCount, vertexArray->bufferConfig);
-
-	bufferCount++;
-
-	if(pglState->colorArrayState == GL_TRUE)
+	for(int i = 0; i < 4; i++)
 	{
-		if(colorArray->inLinearMem)
-			arrayCache = (void*)colorArray->pointer;
-		else
-			arrayCache = _bufferArray(colorArray->pointer, colorArray->stride * end);
+		if(pgl_state.vertex_attrib[i].enabled == false)
+			continue;
 
-		attributesFormat |= GPU_ATTRIBFMT(1, colorArray->size, colorArray->type);
-		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
-		_picaAttribBufferConfig(bufferCount, colorArray->bufferConfig);
-
-		bufferCount++;
+		if(pgl_state.vertex_attrib[i].cached_len < end)
+			cached_vertex_size += pgl_state.vertex_attrib[i].stride * end;
 	}
-	else
+
+	if(indices)
+		cached_vertex_size += count * sizeof(GLushort);
+
+	if(pgl_check_cache_limit(cached_vertex_size) == false)
 	{
-		attributesFixedMask |= 1 << 1;
-		attributesFormat |= GPU_ATTRIBFMT(1, 4, GPU_FLOAT);
-
-		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 1);
-		_picaFixedAttribute(pglState->currentColor.r, pglState->currentColor.g, pglState->currentColor.b, pglState->currentColor.a);
+		glFlush();	
+		pgl_state.vertex_cache_pos = 0;
 	}
 
-	if( (pglState->texCoordArrayState[0] == GL_TRUE) && (pglState->texUnitState[0] == GL_TRUE) )
+	pgl_state_flush();
+	
+	uint8_t buffer_count = 0;
+
+	for(int i = 0; i < 4; i++)
 	{
-		if(texCoordArray[0].inLinearMem)
-			arrayCache = (void*)texCoordArray[0].pointer;
-		else
-			arrayCache = _bufferArray(texCoordArray[0].pointer, texCoordArray[0].stride * end);
+		if(pgl_state.vertex_attrib[i].enabled == false)
+			continue;
 
-		attributesFormat |= GPU_ATTRIBFMT(2, texCoordArray[0].size, texCoordArray[0].type);
-		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
-		_picaAttribBufferConfig(bufferCount, texCoordArray[0].bufferConfig);
+		if(pgl_state.vertex_attrib[i].cached_len < end)
+		{
+			pgl_state.vertex_attrib[i].cached_pointer = pgl_cache_data(pgl_state.vertex_attrib[i].pointer, pgl_state.vertex_attrib[i].stride * end);
+			pgl_state.vertex_attrib[i].cached_len = end;
+		}
 
-		bufferCount++;
+		pica_attribbuffer_config(buffer_count, (uint32_t)pgl_state.vertex_attrib[i].cached_pointer - __ctru_linear_heap, pgl_state.vertex_attrib[i].buffer_config);
+
+		buffer_count += 1;
 	}
-	else
+
+	buffer_count -= 1;
+
+	if(pgl_state.current_mode != PGL_ARRAYS)
 	{
-		attributesFixedMask |= 1 << 2;
-		attributesFormat |= GPU_ATTRIBFMT(2, 2, GPU_FLOAT);
-
-		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 2);
-		_picaFixedAttribute(1, 1, 0, 0);
+		//GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 1);
+		//pica_fixed_attribute(1.0f, 1.0f, 1.0f, 1.0f);
+		GPUCMD_AddWrite(GPUREG_VSH_ATTRIBUTES_PERMUTATION_LOW, attribs_permutation);
 	}
 
-	if( (pglState->texCoordArrayState[1] == GL_TRUE) && (pglState->texUnitState[1] == GL_TRUE) )
-	{	
-		if(texCoordArray[0].inLinearMem)
-			arrayCache = (void*)texCoordArray[0].pointer;
-		else
-			arrayCache = _bufferArray(texCoordArray[0].pointer, texCoordArray[0].stride * end);
-		
-		attributesFormat |= GPU_ATTRIBFMT(3, texCoordArray[1].size, texCoordArray[1].type);
-		_picaAttribBufferOffset(bufferCount, (uint32_t)arrayCache - __ctru_linear_heap);
-		_picaAttribBufferConfig(bufferCount, texCoordArray[1].bufferConfig);
+	GPUCMD_AddWrite(GPUREG_ATTRIBBUFFERS_FORMAT_LOW,  attribs_format[0]);
+	GPUCMD_AddWrite(GPUREG_ATTRIBBUFFERS_FORMAT_HIGH, attribs_format[1] | (buffer_count << 28));
 
-		bufferCount++;
-	}
-	else
-	{
-		attributesFixedMask |= 1 << 3;
-		attributesFormat |= GPU_ATTRIBFMT(3, 2, GPU_FLOAT);
-
-		GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 3);
-		_picaFixedAttribute(1, 1, 0, 0);
-	}
-
-	_picaAttribBuffersFormat(attributesFormat, attributesFixedMask, attributesPermutation, bufferCount);
+	GPUCMD_AddMaskedWrite(GPUREG_VSH_INPUTBUFFER_CONFIG, 0xB, 0xA0000000 | (buffer_count));
+	GPUCMD_AddWrite(GPUREG_VSH_NUM_ATTR, buffer_count);
 
 	GPU_Primitive_t primitive_type;
 
@@ -329,15 +272,50 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 	
 	if(indices)
 	{
-		uint16_t* index_array  = _bufferArray(indices, sizeof(uint16_t) * count);
-
-		_picaDrawElements(primitive_type, (uint32_t)index_array - __ctru_linear_heap, count);
+		uint16_t* index_array  = pgl_cache_data(indices, sizeof(uint16_t) * count);
+		pica_draw_elements(primitive_type, (uint32_t)index_array - __ctru_linear_heap, count);
 	}
 	else
 	{
-		_picaDrawArray(primitive_type, start, count);
+		pica_draw_arrays(primitive_type, start, count);
 	}
 
-	if(++pglState->batchedDraws > MAX_BATCHED_DRAWS)
+	if(++pgl_state.batched_draws > MAX_BATCHED_DRAWS)
 		glFlush();
+
+	pgl_state.current_mode = PGL_ARRAYS;
+}
+
+void glLockArraysEXT (GLint first, GLsizei count)
+{
+	size_t cached_vertex_size = 0;
+
+	for(int i = 0; i < 4; i++)
+	{
+		if(pgl_state.vertex_attrib[i].enabled == false)
+			continue;
+
+		if(pgl_state.vertex_attrib[i].cached_len < count)
+			cached_vertex_size += pgl_state.vertex_attrib[i].stride * count;
+	}
+
+	if(pgl_check_cache_limit(cached_vertex_size) == false)
+	{
+		glFlush();	
+		pgl_state.vertex_cache_pos = 0;
+	}
+
+	for(int i = 0; i < 4; i++)
+	{
+
+		if(pgl_state.vertex_attrib[i].enabled == false)
+			continue;
+
+		if(pgl_state.vertex_attrib[i].cached_len < count)
+		{
+			pgl_state.vertex_attrib[i].cached_pointer = pgl_cache_data(pgl_state.vertex_attrib[i].pointer, pgl_state.vertex_attrib[i].stride * count);
+			pgl_state.vertex_attrib[i].cached_len = count;
+		}
+	}
+	
 }
