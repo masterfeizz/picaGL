@@ -872,8 +872,8 @@ void glSecondaryColorPointer (GLint, GLenum, GLsizei, const GLvoid *);
 
 void glBlendFuncSeparate (GLenum, GLenum, GLenum, GLenum);
 
-void glLockArraysEXT (GLint, GLsizei);
-void glUnlockArraysEXT (void);
+void glLockArrays (GLint, GLsizei);
+void glUnlockArray (void);
 
 void glPolygonOffsetEXT (GLfloat, GLfloat);
 

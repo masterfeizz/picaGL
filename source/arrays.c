@@ -286,8 +286,10 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 	pgl_state.current_mode = PGL_ARRAYS;
 }
 
-void glLockArraysEXT (GLint first, GLsizei count)
+void glLockArrays (GLint first, GLsizei count)
 {
+	int end = first + count;
+
 	size_t cached_vertex_size = 0;
 
 	for(int i = 0; i < 4; i++)
@@ -295,8 +297,7 @@ void glLockArraysEXT (GLint first, GLsizei count)
 		if(pgl_state.vertex_attrib[i].enabled == false)
 			continue;
 
-		if(pgl_state.vertex_attrib[i].cached_len < count)
-			cached_vertex_size += pgl_state.vertex_attrib[i].stride * count;
+		cached_vertex_size += pgl_state.vertex_attrib[i].stride * end;
 	}
 
 	if(pgl_check_cache_limit(cached_vertex_size) == false)
@@ -311,11 +312,10 @@ void glLockArraysEXT (GLint first, GLsizei count)
 		if(pgl_state.vertex_attrib[i].enabled == false)
 			continue;
 
-		if(pgl_state.vertex_attrib[i].cached_len < count)
-		{
-			pgl_state.vertex_attrib[i].cached_pointer = pgl_cache_data(pgl_state.vertex_attrib[i].pointer, pgl_state.vertex_attrib[i].stride * count);
-			pgl_state.vertex_attrib[i].cached_len = count;
-		}
+		pgl_state.vertex_attrib[i].cached_pointer = pgl_cache_data(pgl_state.vertex_attrib[i].pointer, pgl_state.vertex_attrib[i].stride * end);
+		pgl_state.vertex_attrib[i].cached_len = end;
 	}
 	
 }
+
+void glLockArraysEXT (GLint first, GLsizei count){};
