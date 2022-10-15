@@ -47,13 +47,13 @@ void glFlush(void)
 	if(pgl_state.gx_queue.numEntries == pgl_state.gx_queue.maxEntries)
 		pgl_queue_wait(true);
 
-	GSPGPU_FlushDataCache(pgl_state.vertex_cache, VERTEX_BUFFER_SIZE);
+	GSPGPU_FlushDataCache(pgl_state.vertex_cache, pgl_state.vertex_cache_size);
 	
 	u32* commandBuffer;
 	u32  commandBuffer_size;
 
 	GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_FLUSH, 1);
-	//GPUCMD_AddWrite(GPUREG_EARLYDEPTH_CLEAR, 1);
+	GPUCMD_AddWrite(GPUREG_EARLYDEPTH_CLEAR, 1);
 
 	GPUCMD_Split(&commandBuffer, &commandBuffer_size);
 
@@ -66,7 +66,7 @@ void glFlush(void)
 
 	if(flush_count == 4)
 	{
-		GPUCMD_SetBuffer(pgl_state.command_buffer, COMMAND_BUFFER_LENGTH, 0);
+		GPUCMD_SetBuffer(pgl_state.command_buffer, pgl_state.command_buffer_length, 0);
 		flush_count = 0;
 	}
 }
@@ -122,11 +122,9 @@ void pglSwapBuffersEx(unsigned top, unsigned bot)
 	gxCmdQueueSetCallback(&pgl_state.gx_queue, queue_finish_callback, NULL);
 
 	pgl_state.batched_draws = 0;
+	pgl_state.current_mode = 0;
 
 	new_frame = true;
-	
-	pgl_state.current_mode = 0;
-	//gspWaitForVBlank();
 }
 
 void pglSwapBuffers()

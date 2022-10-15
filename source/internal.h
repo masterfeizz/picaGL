@@ -11,13 +11,9 @@
 
 #define MATRIX_STACK_SIZE 16
 
-#define MAX_BATCHED_DRAWS 512
+#define MAX_BATCHED_DRAWS 1024
 
 #define SCRATCH_TEXTURE_SIZE  256 * 256 * 4
-#define VERTEX_BUFFER_SIZE    0x080000
-#define COMMAND_BUFFER_LENGTH 0x060000
-
-#define COMMAND_BUFFER_SIZE   COMMAND_BUFFER_LENGTH * 4
 
 enum
 {
@@ -213,6 +209,7 @@ typedef union {
 typedef struct {
 
 	uint32_t            *command_buffer;
+	size_t               command_buffer_length;
 
 	shaderProgram_s      default_shader_program;
 
@@ -253,6 +250,7 @@ typedef struct {
 
 	void                *vertex_cache;
 	size_t               vertex_cache_pos;
+	size_t               vertex_cache_size;
 
 	GLuint               batched_draws;
 
@@ -265,7 +263,7 @@ typedef struct {
 extern pgl_state_t pgl_state;
 
 // state.c
-void pgl_state_initialize();
+void pgl_state_initialize(size_t command_buffer_length, size_t vertex_cache_size);
 void pgl_state_flush();
 void pgl_state_default();
 

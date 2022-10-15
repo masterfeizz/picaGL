@@ -11,7 +11,7 @@ static inline bool pgl_address_in_linear(const void* addr)
 //Check if we have enough space in the vertex cache
 static bool pgl_check_cache_limit(size_t size)
 {
-	if(pgl_state.vertex_cache_pos + size > VERTEX_BUFFER_SIZE)
+	if(pgl_state.vertex_cache_pos + size > pgl_state.vertex_cache_size)
 		return false;
 	else
 		return true;

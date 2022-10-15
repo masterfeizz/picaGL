@@ -19,19 +19,22 @@ static inline void pgl_texenv_reset(pgl_texenv_t* env)
 	env->scale_alpha = GPU_TEVSCALE_1;
 }
 
-void pgl_state_initialize()
+void pgl_state_initialize(size_t command_buffer_length, size_t vertex_cache_size)
 {
-	pgl_state.command_buffer = linearAlloc(COMMAND_BUFFER_SIZE);
+	pgl_state.command_buffer_length = command_buffer_length;
+	pgl_state.command_buffer = linearAlloc(command_buffer_length * sizeof(uint32_t));
 
-	GPUCMD_SetBuffer(pgl_state.command_buffer, COMMAND_BUFFER_LENGTH, 0);
+	GPUCMD_SetBuffer(pgl_state.command_buffer, pgl_state.command_buffer_length, 0);
 	
 	pgl_state.gx_queue.maxEntries = 32;
 	pgl_state.gx_queue.entries = (gxCmdEntry_s*)malloc(pgl_state.gx_queue.maxEntries * sizeof(gxCmdEntry_s));
 
 	pgl_queue_init();
 
+	pgl_state.vertex_cache_size = vertex_cache_size;
+
 	pgl_state.scratch_texture = linearAlloc(SCRATCH_TEXTURE_SIZE);
-	pgl_state.vertex_cache    = linearAlloc(VERTEX_BUFFER_SIZE);
+	pgl_state.vertex_cache    = linearAlloc(vertex_cache_size);
 
 	//Create render targets
 	//Bottom Screen

@@ -20,7 +20,7 @@ void glBegin(GLenum mode)
 {
 	if(mode < GL_TRIANGLES || mode > GL_POLYGON) return;
 
-	if( (pgl_state.vertex_cache_pos + 0xF00) > VERTEX_BUFFER_SIZE )
+	if( (pgl_state.vertex_cache_pos + 0xF00) > pgl_state.vertex_cache_size )
 	{
 		//glFlush();
 		pgl_state.vertex_cache_pos = 0;
@@ -131,7 +131,7 @@ inline void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
 	if((vertex_count % 84) == 0)
 	{
-		if( (pgl_state.vertex_cache_pos + 0xF00) > VERTEX_BUFFER_SIZE )
+		if( (pgl_state.vertex_cache_pos + 0xF00) > pgl_state.vertex_cache_size )
 		{
 			glEnd();
 			glBegin(GL_TRIANGLES + (primitive_type >> 8));

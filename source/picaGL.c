@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include "internal.h"
 
+#define COMMAND_BUFFER_LENGTH 0x060000
+#define VERTEX_BUFFER_SIZE    0x080000
+
 static int pgl_initialized = 0;
 static aptHookCookie hook_cookie;
 
@@ -33,17 +36,22 @@ static void apt_hook_callback(APT_HookType type, void* param)
 	}
 }
 
-void pglInit()
+void pglInitEx(size_t command_buffer_length, size_t vertex_cache_size)
 {
 	if(pgl_initialized)
 		return;
 
 	memset(&pgl_state, 0, sizeof(pgl_state_t));
 	
-	pgl_state_initialize();
+	pgl_state_initialize(command_buffer_length, vertex_cache_size);
 	pgl_state_default();
 
 	aptHook(&hook_cookie, apt_hook_callback, NULL);
+}
+
+void pglInit()
+{
+	pglInitEx(COMMAND_BUFFER_LENGTH, VERTEX_BUFFER_SIZE);
 }
 
 void pglExit()
