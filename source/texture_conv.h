@@ -42,6 +42,30 @@ static void texture_tile_rgba8(const void *src_v, void *dst_v, int xoffset, int 
 	}
 }
 
+static void texture_tile_rgb565(const void *src_v, void *dst_v, int xoffset, int yoffset, size_t width, size_t height, size_t pitch, size_t inv_h)
+{
+	uint16_t pixel, offset, output_y, coarse_y;
+
+	const uint16_t *src = (uint16_t*)src_v;
+	uint16_t       *dst = (uint16_t*)dst_v;
+
+	for(int y = 0; y < height; y++)
+	{
+		output_y = inv_h - (y + yoffset);
+		coarse_y = output_y & ~7;
+
+		for(int x = 0; x < width; x++)
+		{
+			offset = get_morton_offset(x + xoffset, output_y) + coarse_y * pitch;
+			pixel = src[ x + (y * width) ];
+
+			dst[offset] = 	((pixel & 0x001F) << 11) | 
+							((pixel & 0x07E0) <<  0) | 
+							((pixel & 0xF800) >> 11);
+		}
+	}
+}
+
 static void texture_tile_rgba8_to_rgb8(const void *src_v, void *dst_v, int xoffset, int yoffset, size_t width, size_t height, size_t pitch, size_t inv_h)
 {
 	uint32_t pixel, offset, output_y, coarse_y;
@@ -131,7 +155,8 @@ static tile_func_t pgl_get_tile_func(GPU_TEXCOLOR hw_format, GLenum format, GLen
 		case GPU_RGB8:		if(format == GL_RGBA && type == GL_UNSIGNED_BYTE) return texture_tile_rgba8_to_rgb8;
 							return NULL;
 
-		case GPU_RGB565:	if(format == GL_RGBA && type == GL_UNSIGNED_BYTE) return texture_tile_rgba8_to_rgb565;
+		case GPU_RGB565:	if(format == GL_RGBA && type == GL_UNSIGNED_BYTE)        return texture_tile_rgba8_to_rgb565;
+							if(format == GL_RGB  && type == GL_UNSIGNED_SHORT_5_6_5) return texture_tile_rgb565;
 							return NULL;
 
 		default:		return NULL;

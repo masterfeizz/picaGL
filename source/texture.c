@@ -57,6 +57,20 @@ static GPU_TEXCOLOR _determineHardwareFormat(GLint internalFormat, GLenum format
 			}
 			break;
 
+		case GL_RGB:
+			if(type == GL_UNSIGNED_BYTE && internalFormat == GL_RGB)
+			{
+				if(pgl_state.downsample_textures)
+					return GPU_RGB565;
+				else
+					return GPU_RGB8;
+			}
+			if(type == GL_UNSIGNED_SHORT_5_6_5)
+			{
+				return GPU_RGB565;
+			}
+			break;
+
 		default: break;
 	}
 
@@ -136,7 +150,7 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
 
 	internalFormat = _determineHardwareFormat(internalFormat, format, type);
 
-	if(internalFormat == GPU_UNSUPPORTED) exit(1);
+	if(internalFormat == GPU_UNSUPPORTED) return;
 
 	texture->format = internalFormat;
 	texture->bpp 	= _determineBPP(texture->format);
