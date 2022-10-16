@@ -68,9 +68,6 @@ void glEvalMesh2(GLenum mode, GLint i1, GLint i2, GLint j1, GLint j2) {}
 void glEvalPoint1(GLint i) {}
 void glEvalPoint2(GLint i, GLint j) {}
 void glFeedbackBuffer(GLsizei size, GLenum type, GLfloat *buffer) {}
-void glFogf(GLenum pname, GLfloat param) {}
-void glFogfv(GLenum pname, const GLfloat *params) {}
-void glFogi(GLenum pname, GLint param) {}
 void glFogiv(GLenum pname, const GLint *params) {}
 void glFrontFace(GLenum mode) {}
 void glGetBooleanv(GLenum pname, GLboolean *params) {}

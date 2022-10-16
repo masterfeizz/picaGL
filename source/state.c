@@ -258,6 +258,14 @@ void pgl_state_flush()
 		GPUCMD_AddWrite(GPUREG_TEXUNIT_CONFIG, 0x00011000 | texunit_enable_mask);
 	}
 
+	if(pgl_state.changes & pglDirtyFlag_Fog)
+	{
+		GPUCMD_AddMaskedWrite(GPUREG_TEXENV_UPDATE_BUFFER, 0x5, pgl_state.fog.enabled ? 0x05 | BIT(16) : 0x00);
+		GPUCMD_AddWrite(GPUREG_FOG_COLOR, pgl_state.fog.color);
+		GPUCMD_AddWrite(GPUREG_FOG_LUT_INDEX, 0);
+		GPUCMD_AddWrites(GPUREG_FOG_LUT_DATA0, pgl_state.fog.lut, 128);
+	}
+
 	if(pgl_state.changes & pglDirtyFlag_Mat_ModelView)
 		pica_uniform_float(4, (float*)&pgl_state.matrix_stack[0][ pgl_state.matrix_stack_index[0] ], 4);
 	if(pgl_state.changes & pglDirtyFlag_Mat_Projection)
@@ -304,6 +312,11 @@ static void pgl_enable_disable(GLenum cap, GLboolean state)
 			if(pgl_state.alpha_test.enabled == state) return;
 			pgl_state.alpha_test.enabled = state;
 			pgl_state.changes |= pglDirtyFlag_AlphaTest;
+			break;
+		case GL_FOG:
+			if(pgl_state.fog.enabled == state) return;
+			pgl_state.fog.enabled = state;
+			pgl_state.changes |= pglDirtyFlag_Fog;
 			break;
 		default:
 			break;

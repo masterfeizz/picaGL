@@ -27,10 +27,11 @@ enum
 	pglDirtyFlag_Texture      = BIT(7),
 	pglDirtyFlag_TexEnv       = BIT(8),
 	pglDirtyFlag_RenderTarget = BIT(9),
-	pglDirtyFlag_Matrix       = BIT(10),
+	pglDirtyFlag_Fog          = BIT(10),
+	pglDirtyFlag_Matrix       = BIT(11),
 
-	pglDirtyFlag_Mat_ModelView   = BIT(10),
-	pglDirtyFlag_Mat_Projection  = BIT(11),
+	pglDirtyFlag_Mat_ModelView   = BIT(11),
+	pglDirtyFlag_Mat_Projection  = BIT(12),
 
 	pglDirtyFlag_Any = 0xFFFF,
 };
@@ -182,6 +183,20 @@ typedef struct {
 
 } pgl_facecull_t;
 
+typedef struct {
+
+	bool enabled;
+
+	float density;
+	float near;
+	float far;
+
+	uint32_t lut[128];
+	uint32_t mode;
+	uint32_t color;
+
+} pgl_fog_t;
+
 typedef union {
 
 	uint32_t value;
@@ -225,6 +240,7 @@ typedef struct {
 	pgl_facecull_t       face_cull;
 	pgl_scissor_t        scissor;
 	pgl_viewport_t       viewport;
+	pgl_fog_t            fog;
 
 	pgl_texenv_t         texenv[4];
 	
