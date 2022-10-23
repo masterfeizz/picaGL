@@ -28,6 +28,7 @@ void glClear(GLbitfield mask)
 	pica_depth_color_mask(true, GPU_ALWAYS, write_mask);
 	pica_facecull_mode(GPU_CULL_NONE);
 
+	GPUCMD_AddMaskedWrite(GPUREG_TEXENV_UPDATE_BUFFER, 0x5, 0x00); //Disable fog
 	GPUCMD_AddIncrementalWrites(GPUREG_TEXENV0_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_UNTEXTURED], 5);
 	GPUCMD_AddIncrementalWrites(GPUREG_TEXENV1_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
 
