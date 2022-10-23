@@ -21,10 +21,11 @@ static inline void pgl_texenv_reset(pgl_texenv_t* env)
 
 void pgl_state_initialize(size_t command_buffer_length, size_t vertex_cache_size)
 {
-	pgl_state.command_buffer_length = command_buffer_length;
-	pgl_state.command_buffer = linearAlloc(command_buffer_length * sizeof(uint32_t));
+	pgl_state.command_buffer_length = command_buffer_length / 2;
+	pgl_state.command_buffer[0] = linearAlloc(pgl_state.command_buffer_length * sizeof(uint32_t));
+	pgl_state.command_buffer[1] = linearAlloc(pgl_state.command_buffer_length * sizeof(uint32_t));
 
-	GPUCMD_SetBuffer(pgl_state.command_buffer, pgl_state.command_buffer_length, 0);
+	GPUCMD_SetBuffer(pgl_state.command_buffer[0], pgl_state.command_buffer_length, 0);
 	
 	pgl_state.gx_queue.maxEntries = 32;
 	pgl_state.gx_queue.entries = (gxCmdEntry_s*)malloc(pgl_state.gx_queue.maxEntries * sizeof(gxCmdEntry_s));

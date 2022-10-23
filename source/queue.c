@@ -35,6 +35,7 @@ void pgl_queue_wait(bool clear)
 void glFlush(void)
 {
 	static uint32_t flush_count = 0;
+	static uint32_t next_buffer = 1;
 
 	if(new_frame)
 	{
@@ -62,11 +63,10 @@ void glFlush(void)
 	
 	pgl_state.batched_draws = 0;
 
-	flush_count += 1;
-
-	if(flush_count == 4)
+	if(++flush_count >= 2)
 	{
-		GPUCMD_SetBuffer(pgl_state.command_buffer, pgl_state.command_buffer_length, 0);
+		GPUCMD_SetBuffer(pgl_state.command_buffer[next_buffer], pgl_state.command_buffer_length, 0);
+		next_buffer = !next_buffer;
 		flush_count = 0;
 	}
 }
