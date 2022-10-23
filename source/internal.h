@@ -223,7 +223,7 @@ typedef union {
 
 typedef struct {
 
-	uint32_t            *command_buffer;
+	uint32_t            *command_buffer[2];
 	size_t               command_buffer_length;
 
 	shaderProgram_s      default_shader_program;
