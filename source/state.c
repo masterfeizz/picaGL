@@ -126,7 +126,7 @@ void pgl_state_default()
 	GPUCMD_AddIncrementalWrites(GPUREG_TEXENV4_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
 	GPUCMD_AddIncrementalWrites(GPUREG_TEXENV5_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
 
-	pgl_state.changes = 0xffffff;
+	pgl_state.changes = pgl_change_any;
 }
 
 static void pica_texture_set(GPU_TEXUNIT unit, pgl_texture_t* texture)
@@ -187,27 +187,27 @@ void pgl_state_flush()
 	if(!pgl_state.changes)
 		return;
 	
-	if(pgl_state.changes & pglDirtyFlag_RenderTarget)
+	if(pgl_state.changes & pgl_change_rendertarget)
 	{
 		pica_rendertarget_set(pgl_state.render_target_active);
 	}
 
-	if(pgl_state.changes & pglDirtyFlag_Viewport)
+	if(pgl_state.changes & pgl_change_viewport)
 	{
 		pica_viewport(pgl_state.viewport.y, pgl_state.viewport.x, pgl_state.viewport.height, pgl_state.viewport.width);
 	}
 
-	if(pgl_state.changes & pglDirtyFlag_Scissor)
+	if(pgl_state.changes & pgl_change_scissor)
 	{
 		pica_scissor_test(pgl_state.scissor.enabled, pgl_state.scissor.y, pgl_state.scissor.x, pgl_state.scissor.y + pgl_state.scissor.height, pgl_state.scissor.x + pgl_state.scissor.width);
 	}
 
-	if(pgl_state.changes & pglDirtyFlag_AlphaTest)
+	if(pgl_state.changes & pgl_change_alphatest)
 	{
 		GPUCMD_AddWrite(GPUREG_FRAGOP_ALPHA_TEST, pgl_state.alpha_test.value);
 	}
 
-	if(pgl_state.changes & pglDirtyFlag_Blend)
+	if(pgl_state.changes & pgl_change_blend)
 	{
 		if(pgl_state.blend.enabled)
 		{
@@ -221,22 +221,22 @@ void pgl_state_flush()
 		}
 	}
 
-	if(pgl_state.changes & pglDirtyFlag_DepthMap)
+	if(pgl_state.changes & pgl_change_depthmap)
 	{
 		pica_depthmap(pgl_state.depthmap.near, pgl_state.depthmap.far, pgl_state.depthmap.offset_enabled ? pgl_state.depthmap.offset : 0);
 	}
 
-	if(pgl_state.changes & pglDirtyFlag_DepthTest)
+	if(pgl_state.changes & pgl_change_depthtest)
 	{
 		GPUCMD_AddWrite(GPUREG_DEPTH_COLOR_MASK, pgl_state.depth_test.value);
 	}
 
-	if(pgl_state.changes & pglDirtyFlag_Cull)
+	if(pgl_state.changes & pgl_change_cull)
 	{
 		pica_facecull_mode(pgl_state.face_cull.enabled ? pgl_state.face_cull.mode : GPU_CULL_NONE);
 	}
 
-	if(pgl_state.changes & pglDirtyFlag_TexEnv)
+	if(pgl_state.changes & pgl_change_texenv)
 	{
 
 		if(pgl_state.texunit_enabled[0])
@@ -250,7 +250,7 @@ void pgl_state_flush()
 			GPUCMD_AddIncrementalWrites(GPUREG_TEXENV1_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
 	}
 
-	if(pgl_state.changes & pglDirtyFlag_Texture)
+	if(pgl_state.changes & pgl_change_texture)
 	{
 
 		uint16_t texunit_enable_mask = 0;
@@ -270,7 +270,7 @@ void pgl_state_flush()
 		GPUCMD_AddWrite(GPUREG_TEXUNIT_CONFIG, 0x00011000 | texunit_enable_mask);
 	}
 
-	if(pgl_state.changes & pglDirtyFlag_Fog)
+	if(pgl_state.changes & pgl_change_fog)
 	{
 		GPUCMD_AddMaskedWrite(GPUREG_TEXENV_UPDATE_BUFFER, 0x5, pgl_state.fog.enabled ? 0x05 | BIT(16) : 0x00);
 		GPUCMD_AddWrite(GPUREG_FOG_COLOR, pgl_state.fog.color);
@@ -278,9 +278,9 @@ void pgl_state_flush()
 		GPUCMD_AddWrites(GPUREG_FOG_LUT_DATA0, pgl_state.fog.lut, 128);
 	}
 
-	if(pgl_state.changes & pglDirtyFlag_Mat_ModelView)
+	if(pgl_state.changes & pgl_change_modelview)
 		pica_uniform_float(4, (float*)&pgl_state.matrix_stack[0][ pgl_state.matrix_stack_index[0] ], 4);
-	if(pgl_state.changes & pglDirtyFlag_Mat_Projection)
+	if(pgl_state.changes & pgl_change_projection)
 		pica_uniform_float(0, (float*)&pgl_state.matrix_stack[1][ pgl_state.matrix_stack_index[1] ], 4);
 
 	pgl_state.changes = 0;
@@ -293,42 +293,42 @@ static void pgl_enable_disable(GLenum cap, GLboolean state)
 		case GL_DEPTH_TEST:
 			if(pgl_state.depth_test.enabled == state) return;
 			pgl_state.depth_test.enabled = state;
-			pgl_state.changes |= pglDirtyFlag_DepthTest;
+			pgl_state.changes |= pgl_change_depthtest;
 			break;
 		case GL_POLYGON_OFFSET_FILL:
 			if(pgl_state.depthmap.offset_enabled == state) return;
 			pgl_state.depthmap.offset_enabled = state;
-			pgl_state.changes |= pglDirtyFlag_DepthTest;
+			pgl_state.changes |= pgl_change_depthtest;
 			break;
 		case GL_BLEND:
 			if(pgl_state.blend.enabled == state) return;
 			pgl_state.blend.enabled = state;
-			pgl_state.changes |= pglDirtyFlag_Blend;
+			pgl_state.changes |= pgl_change_blend;
 			break;
 		case GL_SCISSOR_TEST:
 			if(pgl_state.scissor.enabled == state) return;
 			pgl_state.scissor.enabled = state ? 0x3 : 0x0;
-			pgl_state.changes |= pglDirtyFlag_Scissor;
+			pgl_state.changes |= pgl_change_scissor;
 			break;
 		case GL_CULL_FACE:
 			if(pgl_state.face_cull.enabled == state) return;
 			pgl_state.face_cull.enabled = state;
-			pgl_state.changes |= pglDirtyFlag_Cull;
+			pgl_state.changes |= pgl_change_cull;
 			break;
 		case GL_TEXTURE_2D:
 			if(pgl_state.texunit_enabled[pgl_state.texunit_active] == state) return;
 			pgl_state.texunit_enabled[pgl_state.texunit_active] = state;
-			pgl_state.changes |= pglDirtyFlag_TexEnv;
+			pgl_state.changes |= pgl_change_texenv;
 			break;
 		case GL_ALPHA_TEST:
 			if(pgl_state.alpha_test.enabled == state) return;
 			pgl_state.alpha_test.enabled = state;
-			pgl_state.changes |= pglDirtyFlag_AlphaTest;
+			pgl_state.changes |= pgl_change_alphatest;
 			break;
 		case GL_FOG:
 			if(pgl_state.fog.enabled == state) return;
 			pgl_state.fog.enabled = state;
-			pgl_state.changes |= pglDirtyFlag_Fog;
+			pgl_state.changes |= pgl_change_fog;
 			break;
 		default:
 			break;

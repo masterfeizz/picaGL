@@ -44,7 +44,7 @@ void glAlphaFunc(GLenum func, GLclampf ref)
 	pgl_state.alpha_test.function = pgl_convert_testfunc(func);
 	pgl_state.alpha_test.reference = (GLuint)(ref * 255.0f);
 
-	pgl_state.changes |= pglDirtyFlag_AlphaTest;
+	pgl_state.changes |= pgl_change_alphatest;
 }
 
 void glBlendColor(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha)
@@ -56,7 +56,7 @@ void glBlendColor(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha)
 
 	pgl_state.blend.color = r | (g << 8) | (b << 16) | (a << 24);
 
-	pgl_state.changes |= pglDirtyFlag_Blend;
+	pgl_state.changes |= pgl_change_blend;
 }
 
 void glBlendEquation(GLenum mode)
@@ -74,7 +74,7 @@ void glBlendEquation(GLenum mode)
 			break;
 	}
 
-	pgl_state.changes |= pglDirtyFlag_Blend;
+	pgl_state.changes |= pgl_change_blend;
 }
 
 void glBlendFunc(GLenum sfactor, GLenum dfactor)
@@ -82,5 +82,5 @@ void glBlendFunc(GLenum sfactor, GLenum dfactor)
 	pgl_state.blend.alpha_sfactor = pgl_state.blend.rgb_sfactor = pgl_convert_blendfactor(sfactor);
 	pgl_state.blend.alpha_dfactor = pgl_state.blend.rgb_dfactor = pgl_convert_blendfactor(dfactor);
 
-	pgl_state.changes |= pglDirtyFlag_Blend;
+	pgl_state.changes |= pgl_change_blend;
 }

@@ -15,7 +15,7 @@ void glTexEnvfv( GLenum target, GLenum pname, const GLfloat *params )
 
 	texenv->color = r | (g << 8) | (b << 16) | (a << 24);
 	
-	pgl_state.changes |= pglDirtyFlag_TexEnv;
+	pgl_state.changes |= pgl_change_texenv;
 }
 
 inline void glTexEnvi (GLenum target, GLenum pname, GLint param)
@@ -82,7 +82,7 @@ inline void glTexEnvi (GLenum target, GLenum pname, GLint param)
 		break;
 	}
 
-	pgl_state.changes |= pglDirtyFlag_TexEnv;
+	pgl_state.changes |= pgl_change_texenv;
 }
 
 void glTexEnvf (GLenum target, GLenum pname, GLfloat param)

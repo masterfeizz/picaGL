@@ -25,7 +25,7 @@ void glLoadIdentity(void)
 {
 	*pgl_state.matrix_current = pgl_matrix_identity;
 
-	pgl_state.changes |= (pglDirtyFlag_Matrix << (pgl_state.matrix_mode));
+	pgl_state.changes |= (pgl_change_matrix << (pgl_state.matrix_mode));
 }
 
 void glTranslatef(GLfloat x,  GLfloat y,  GLfloat z)
@@ -40,7 +40,7 @@ void glTranslatef(GLfloat x,  GLfloat y,  GLfloat z)
 
 	mat4f_multiply(pgl_state.matrix_current, &tmp, &trans);
 
-	pgl_state.changes |= (pglDirtyFlag_Matrix << (pgl_state.matrix_mode));
+	pgl_state.changes |= (pgl_change_matrix << (pgl_state.matrix_mode));
 }
 
 void glScalef(GLfloat x, GLfloat y, GLfloat z)
@@ -54,7 +54,7 @@ void glScalef(GLfloat x, GLfloat y, GLfloat z)
 		matrix->row[i].z *= z;
 	}
 
-	pgl_state.changes |= (pglDirtyFlag_Matrix << (pgl_state.matrix_mode));
+	pgl_state.changes |= (pgl_change_matrix << (pgl_state.matrix_mode));
 }
 
 void glRotatef(GLfloat angle,  GLfloat x,  GLfloat y,  GLfloat z)
@@ -96,7 +96,7 @@ void glRotatef(GLfloat angle,  GLfloat x,  GLfloat y,  GLfloat z)
 		matrix->row[i].z = z;
 	}
 
-	pgl_state.changes |= (pglDirtyFlag_Matrix << (pgl_state.matrix_mode));
+	pgl_state.changes |= (pgl_change_matrix << (pgl_state.matrix_mode));
 }
 
 void glMatrixMode(GLenum mode)
@@ -130,7 +130,7 @@ void glOrtho(GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLdou
 	matrix->row[2].z = (-matrix->row[2].z * 0.5f);
 	matrix->row[2].w = (-matrix->row[2].w * 0.5f) - 0.5f;
 
-	pgl_state.changes |= (pglDirtyFlag_Matrix << (pgl_state.matrix_mode));
+	pgl_state.changes |= (pgl_change_matrix << (pgl_state.matrix_mode));
 }
 
 void glFrustum(GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLdouble near, GLdouble far)
@@ -151,7 +151,7 @@ void glFrustum(GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLd
 	matrix->row[2].z = (-matrix->row[2].z * 0.5f) + 0.5f;
 	matrix->row[2].w = (-matrix->row[2].w * 0.5f);
 
-	pgl_state.changes |= (pglDirtyFlag_Matrix << (pgl_state.matrix_mode));
+	pgl_state.changes |= (pgl_change_matrix << (pgl_state.matrix_mode));
 }
 
 void glPopMatrix(void)
@@ -163,7 +163,7 @@ void glPopMatrix(void)
 
 	pgl_state.matrix_current = &pgl_state.matrix_stack[pgl_state.matrix_mode][index];
 
-	pgl_state.changes |= (pglDirtyFlag_Matrix << (pgl_state.matrix_mode));
+	pgl_state.changes |= (pgl_change_matrix << (pgl_state.matrix_mode));
 }
 
 void glPushMatrix(void)
@@ -208,7 +208,7 @@ void glLoadMatrixf(const GLfloat* m)
 		matrix->row[2].w = 0.5f * (matrix->row[2].w - matrix->row[3].w);
 	}
 
-	pgl_state.changes |= (pglDirtyFlag_Matrix << (pgl_state.matrix_mode));
+	pgl_state.changes |= (pgl_change_matrix << (pgl_state.matrix_mode));
 }
 
 void glMultMatrixf(const GLfloat *m)
@@ -227,5 +227,5 @@ void glMultMatrixf(const GLfloat *m)
 
 	*pgl_state.matrix_current = tmp;
 
-	pgl_state.changes |= (pglDirtyFlag_Matrix << (pgl_state.matrix_mode));
+	pgl_state.changes |= (pgl_change_matrix << (pgl_state.matrix_mode));
 }

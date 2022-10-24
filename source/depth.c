@@ -25,14 +25,14 @@ void glDepthFunc(GLenum func)
 {
 	pgl_state.depth_test.function = pgl_convert_testfunc(func);
 
-	pgl_state.changes |= pglDirtyFlag_DepthTest;
+	pgl_state.changes |= pgl_change_depthtest;
 }
 
 void glDepthMask(GLboolean flag)
 {
 	pgl_state.depth_test.write_mask = (pgl_state.depth_test.write_mask & 0xF) | ((flag & 0x1) << 4);
 
-	pgl_state.changes |= pglDirtyFlag_DepthTest;
+	pgl_state.changes |= pgl_change_depthtest;
 }
 
 void glDepthRange(GLclampd nearVal, GLclampd farVal)
@@ -40,7 +40,7 @@ void glDepthRange(GLclampd nearVal, GLclampd farVal)
 	pgl_state.depthmap.near = (float)farVal;
 	pgl_state.depthmap.far  = (float)nearVal;
 
-	pgl_state.changes |= pglDirtyFlag_DepthMap;
+	pgl_state.changes |= pgl_change_depthmap;
 }
 
 void glPolygonOffset(GLfloat factor, GLfloat units) 
@@ -48,5 +48,5 @@ void glPolygonOffset(GLfloat factor, GLfloat units)
 	//Not correct, but seems to do it for my needs
 	pgl_state.depthmap.offset = units / (1 << 12);
 
-	pgl_state.changes |= pglDirtyFlag_DepthMap;
+	pgl_state.changes |= pgl_change_depthmap;
 }

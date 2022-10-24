@@ -11,30 +11,31 @@
 
 #define MATRIX_STACK_SIZE 16
 
-#define MAX_BATCHED_DRAWS 1024
+#define MAX_BATCHED_DRAWS 2048
 
 #define SCRATCH_TEXTURE_SIZE  256 * 256 * 4
 
-enum
-{
-	pglDirtyFlag_Viewport     = BIT(0),
-	pglDirtyFlag_DepthTest    = BIT(1),
-	pglDirtyFlag_AlphaTest    = BIT(2),
-	pglDirtyFlag_Cull         = BIT(3),
-	pglDirtyFlag_DepthMap     = BIT(4),
-	pglDirtyFlag_Blend        = BIT(5),
-	pglDirtyFlag_Scissor      = BIT(6),
-	pglDirtyFlag_Texture      = BIT(7),
-	pglDirtyFlag_TexEnv       = BIT(8),
-	pglDirtyFlag_RenderTarget = BIT(9),
-	pglDirtyFlag_Fog          = BIT(10),
-	pglDirtyFlag_Matrix       = BIT(11),
+typedef enum {
 
-	pglDirtyFlag_Mat_ModelView   = BIT(11),
-	pglDirtyFlag_Mat_Projection  = BIT(12),
+	pgl_change_viewport     = BIT(0),
+	pgl_change_depthtest    = BIT(1),
+	pgl_change_alphatest    = BIT(2),
+	pgl_change_cull         = BIT(3),
+	pgl_change_depthmap     = BIT(4),
+	pgl_change_blend        = BIT(5),
+	pgl_change_scissor      = BIT(6),
+	pgl_change_texture      = BIT(7),
+	pgl_change_texenv       = BIT(8),
+	pgl_change_rendertarget = BIT(9),
+	pgl_change_fog          = BIT(10),
+	pgl_change_matrix       = BIT(11),
 
-	pglDirtyFlag_Any = 0xFFFF,
-};
+	pgl_change_modelview    = BIT(11),
+	pgl_change_projection   = BIT(12),
+
+	pgl_change_any = 0xFFFF,
+
+} pgl_change_flags_t;
 
 #define PGL_TEXENV_UNTEXTURED 2
 #define PGL_TEXENV_DUMMY 3
@@ -252,7 +253,7 @@ typedef struct {
 	int                  matrix_mode;
 	mat4f               *matrix_current;
 
-	uint32_t             changes;
+	pgl_change_flags_t   changes;
 
 	bool                 texunit_enabled[2];
 	uint16_t             texunit_active;

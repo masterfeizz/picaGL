@@ -14,7 +14,8 @@ static void apt_hook_callback(APT_HookType type, void* param)
 	{
 		case APTHOOK_ONSUSPEND:
 		{
-			pgl_queue_wait(true);
+			glFinish();
+
 			break;
 		}
 		case APTHOOK_ONRESTORE:
@@ -28,7 +29,7 @@ static void apt_hook_callback(APT_HookType type, void* param)
 
 			shaderProgramUse(&pgl_state.default_shader_program);
 
-			pgl_state.changes |= 0xFFFFFFFF;
+			pgl_state.changes = pgl_change_any;
 
 			break;
 		}
@@ -56,10 +57,10 @@ void pglInit()
 
 void pglExit()
 {
+	aptUnhook(&hook_cookie);
+	
 	pgl_queue_wait(true);
 	GX_BindQueue(NULL);
-	aptUnhook(&hook_cookie);
-
 	//TODO: Clear memory
 }
 
@@ -70,5 +71,5 @@ void pglSelectScreen(unsigned display, unsigned side)
 	else 
 		pgl_state.render_target_active = &pgl_state.render_target[1];
 
-	pgl_state.changes |= pglDirtyFlag_RenderTarget;
+	pgl_state.changes |= pgl_change_rendertarget;
 }

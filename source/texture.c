@@ -10,13 +10,13 @@
 
 static pgl_texture_t *textures[MAX_TEXTURES] = { NULL };
 
-static inline bool _addressIsVRAM(const void* addr)
+static inline bool pgl_address_is_vram(const void* addr)
 {
 	u32 vaddr = (u32)addr;
 	return vaddr >= 0x1F000000 && vaddr < 0x1F600000;
 }
 
-static size_t _determineBPP(GPU_TEXCOLOR format)
+static size_t pgl_determine_bpp(GPU_TEXCOLOR format)
 {
 	switch (format)
 	{
@@ -36,7 +36,7 @@ static size_t _determineBPP(GPU_TEXCOLOR format)
 	}
 }
 
-static GPU_TEXCOLOR _determineHardwareFormat(GLint internalFormat, GLenum format, GLenum type)
+static GPU_TEXCOLOR pgl_determine_hardware_format(GLint internalFormat, GLenum format, GLenum type)
 {
 	switch(format)
 	{	
@@ -103,7 +103,7 @@ static inline uint32_t _picaConvertFilter(uint32_t param)
 	}
 }
 
-static inline void *_textureDataAlloc(size_t size)
+static inline void *pgl_texture_data_alloc(size_t size)
 {
 	void *ret = NULL;
 
@@ -116,7 +116,7 @@ static inline void *_textureDataAlloc(size_t size)
 	return ret;
 }
 
-static inline void _textureDataFree(pgl_texture_t *texture)
+static inline void pgl_texture_data_free(pgl_texture_t *texture)
 {
 	if(texture->in_vram)
 		vramFree(texture->data);
@@ -146,25 +146,25 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
 	pgl_texture_t *texture = pgl_state.texture_bound[pgl_state.texunit_active];
 
 	if(texture->data)
-		_textureDataFree(texture);
+		pgl_texture_data_free(texture);
 
-	internalFormat = _determineHardwareFormat(internalFormat, format, type);
+	internalFormat = pgl_determine_hardware_format(internalFormat, format, type);
 
 	if(internalFormat == GPU_UNSUPPORTED) return;
 
 	texture->format = internalFormat;
-	texture->bpp 	= _determineBPP(texture->format);
+	texture->bpp 	= pgl_determine_bpp(texture->format);
 	texture->width  = width;
 	texture->height = height;
-	texture->data   = _textureDataAlloc(width * height * texture->bpp);
+	texture->data   = pgl_texture_data_alloc(width * height * texture->bpp);
 	texture->max_level = 0;
 
 	if(texture->data == NULL)
 		return;
 
-	texture->in_vram = _addressIsVRAM(texture->data);
+	texture->in_vram = pgl_address_is_vram(texture->data);
 
-	pgl_state.changes |= pglDirtyFlag_Texture;
+	pgl_state.changes |= pgl_change_texture;
 
 	if(!data) return;
 
@@ -210,7 +210,7 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
 		GX_TextureCopy(texture->data, 0, new_data, 0, texture->width * texture->height * texture->bpp, 8);
 		pgl_queue_wait(true);
 
-		_textureDataFree(texture);
+		pgl_texture_data_free(texture);
 
 		texture->data = new_data;
 		texture->in_vram = false;
@@ -220,7 +220,7 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
 
 	GSPGPU_FlushDataCache(texture->data, texture->width * texture->height * texture->bpp);
 
-	pgl_state.changes |= pglDirtyFlag_Texture;
+	pgl_state.changes |= pgl_change_texture;
 }
 
 void glTexParameterf(GLenum target, GLenum pname, GLfloat param)
@@ -249,7 +249,7 @@ void glTexParameterf(GLenum target, GLenum pname, GLfloat param)
 
 	texture->param = tex_param;
 
-	pgl_state.changes |= pglDirtyFlag_Texture;
+	pgl_state.changes |= pgl_change_texture;
 }
 
 void glTexParameteri(GLenum target, GLenum pname, GLint param)
@@ -277,7 +277,7 @@ void glBindTexture(GLenum target, GLuint texture)
 
 	pgl_state.texture_bound[pgl_state.texunit_active] = tex;
 
-	pgl_state.changes |= pglDirtyFlag_Texture;
+	pgl_state.changes |= pgl_change_texture;
 }
 
 void glGenTextures(GLsizei n, GLuint *texture)
@@ -313,7 +313,7 @@ void glDeleteTextures(GLsizei n, const GLuint *texture)
 			continue;
 
 		if(texObject->data)
-			_textureDataFree(texObject);
+			pgl_texture_data_free(texObject);
 
 		free(texObject);
 
@@ -348,7 +348,7 @@ void glGenerateMipmap(GLenum target)
 	if(texture->data == NULL) return;
 	if(texture->width < 128 || texture->height < 128) return;
 
-	void *new_data = _textureDataAlloc(texture->width * texture->height * texture->bpp * 2);
+	void *new_data = pgl_texture_data_alloc(texture->width * texture->height * texture->bpp * 2);
 
 	if(!new_data) return;
 
@@ -365,13 +365,13 @@ void glGenerateMipmap(GLenum target)
 
 	pgl_queue_wait(true);
 
-	_textureDataFree(texture);
+	pgl_texture_data_free(texture);
 
 	texture->data = new_data;
-	texture->in_vram = _addressIsVRAM(texture->data);
+	texture->in_vram = pgl_address_is_vram(texture->data);
 	texture->max_level = 1;
 
 	GSPGPU_FlushDataCache(texture->data, texture->width * texture->height * texture->bpp * 2);
 
-	pgl_state.changes |= pglDirtyFlag_Texture;
+	pgl_state.changes |= pgl_change_texture;
 }

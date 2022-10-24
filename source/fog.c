@@ -90,7 +90,7 @@ void glFogf(GLenum pname, GLfloat param)
 	
 	pgl_generate_lut();
 
-	pgl_state.changes |= pglDirtyFlag_Fog;
+	pgl_state.changes |= pgl_change_fog;
 }
 
 void glFogi(GLenum pname, GLint param)

@@ -47,7 +47,7 @@ void glClear(GLbitfield mask)
 	pica_immediate_end();
 
 	pgl_state.current_mode = 0;
-	pgl_state.changes = pglDirtyFlag_Any;
+	pgl_state.changes = pgl_change_any;
 }
 
 void glClearColor(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha)
@@ -64,7 +64,7 @@ void glColorMask(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha
 	
 	pgl_state.depth_test.write_mask = (pgl_state.depth_test.write_mask & 0x10) | mask;
 
-	pgl_state.changes |= pglDirtyFlag_DepthTest;
+	pgl_state.changes |= pgl_change_depthtest;
 }
 
 void glCullFace(GLenum mode)
@@ -79,7 +79,7 @@ void glCullFace(GLenum mode)
 			break;
 	}
 
-	pgl_state.changes |= pglDirtyFlag_Cull;
+	pgl_state.changes |= pgl_change_cull;
 }
 
 void glViewport(GLint x, GLint y, GLsizei width, GLsizei height)
@@ -95,7 +95,7 @@ void glViewport(GLint x, GLint y, GLsizei width, GLsizei height)
 	pgl_state.viewport.height = height;
 	pgl_state.viewport.width = width;
 
-	pgl_state.changes |= pglDirtyFlag_Viewport;
+	pgl_state.changes |= pgl_change_viewport;
 }
 
 void glScissor(GLint x, GLint y, GLsizei width, GLsizei height)
@@ -111,5 +111,5 @@ void glScissor(GLint x, GLint y, GLsizei width, GLsizei height)
 	pgl_state.scissor.width = width;
 	pgl_state.scissor.height = height;
 
-	pgl_state.changes |= pglDirtyFlag_Scissor;
+	pgl_state.changes |= pgl_change_scissor;
 }
