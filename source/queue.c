@@ -1,6 +1,5 @@
 #include "internal.h"
 
-static int  new_frame = 0;
 static bool swap_top, swap_bottom;
 
 static void queue_finish_callback(gxCmdQueue_s* queue)
@@ -34,19 +33,11 @@ void pgl_queue_wait(bool clear)
 
 void glFlush(void)
 {
-	static uint32_t flush_count = 0;
 	static uint32_t next_buffer = 1;
-
-	if(new_frame)
-	{
-		new_frame = false;
-		pgl_queue_wait(true);
-	}
 
 	if(pgl_state.batched_draws == 0) return;
 
-	if(pgl_state.gx_queue.numEntries == pgl_state.gx_queue.maxEntries)
-		pgl_queue_wait(true);
+	pgl_queue_wait(true);
 
 	GSPGPU_FlushDataCache(pgl_state.vertex_cache, pgl_state.vertex_cache_size);
 	
@@ -63,12 +54,9 @@ void glFlush(void)
 	
 	pgl_state.batched_draws = 0;
 
-	if(++flush_count >= 2)
-	{
-		GPUCMD_SetBuffer(pgl_state.command_buffer[next_buffer], pgl_state.command_buffer_length, 0);
-		next_buffer = !next_buffer;
-		flush_count = 0;
-	}
+	GPUCMD_SetBuffer(pgl_state.command_buffer[next_buffer], pgl_state.command_buffer_length, 0);
+	
+	next_buffer = !next_buffer;
 }
 
 void glFinish(void)
@@ -123,8 +111,6 @@ void pglSwapBuffersEx(unsigned top, unsigned bot)
 
 	pgl_state.batched_draws = 0;
 	pgl_state.current_mode = 0;
-
-	new_frame = true;
 }
 
 void pglSwapBuffers()
