@@ -182,10 +182,11 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
 
 	texture_tile(data, tiled_output, 0, 0, width, height, width, height - 1);
 
-	GSPGPU_FlushDataCache(tiled_output, texture->width * texture->height * texture->bpp);
-
 	if(texture->in_vram)
+	{
+		GSPGPU_FlushDataCache(tiled_output, texture->width * texture->height * texture->bpp);
 		GX_TextureCopy(tiled_output, 0, texture->data, 0, texture->width * texture->height * texture->bpp, 8);
+	}
 }
 
 void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid* data)
@@ -217,8 +218,6 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
 	}
 
 	texture_tile(data, texture->data, xoffset, yoffset, width, height, texture->width, texture->height - 1);
-
-	GSPGPU_FlushDataCache(texture->data, texture->width * texture->height * texture->bpp);
 
 	pgl_state.changes |= pgl_change_texture;
 }
@@ -370,8 +369,6 @@ void glGenerateMipmap(GLenum target)
 	texture->data = new_data;
 	texture->in_vram = pgl_address_is_vram(texture->data);
 	texture->max_level = 1;
-
-	GSPGPU_FlushDataCache(texture->data, texture->width * texture->height * texture->bpp * 2);
 
 	pgl_state.changes |= pgl_change_texture;
 }

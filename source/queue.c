@@ -38,8 +38,6 @@ void glFlush(void)
 	if(pgl_state.batched_draws == 0) return;
 
 	pgl_queue_wait(true);
-
-	GSPGPU_FlushDataCache(pgl_state.vertex_cache, pgl_state.vertex_cache_size);
 	
 	u32* commandBuffer;
 	u32  commandBuffer_size;
@@ -55,7 +53,7 @@ void glFlush(void)
 	pgl_state.batched_draws = 0;
 
 	GPUCMD_SetBuffer(pgl_state.command_buffer[next_buffer], pgl_state.command_buffer_length, 0);
-	
+
 	next_buffer = !next_buffer;
 }
 
