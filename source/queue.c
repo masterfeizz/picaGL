@@ -31,35 +31,41 @@ void pgl_queue_wait(bool clear)
 		gxCmdQueueClear(&pgl_state.gx_queue);
 }
 
-void glFlush(void)
+void pgl_queue_commands(bool swap_list)
 {
 	static uint32_t next_buffer = 1;
 
-	if(pgl_state.batched_draws == 0) return;
-
-	pgl_queue_wait(true);
-	
-	u32* commandBuffer;
-	u32  commandBuffer_size;
+	u32* command_buffer;
+	u32  command_buffer_size;
 
 	GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_FLUSH, 1);
-	GPUCMD_AddWrite(GPUREG_EARLYDEPTH_CLEAR, 1);
 
-	GPUCMD_Split(&commandBuffer, &commandBuffer_size);
+	GPUCMD_Split(&command_buffer, &command_buffer_size);
 
-	GX_FlushCacheRegions (commandBuffer, commandBuffer_size * 4, (u32 *) __ctru_linear_heap, __ctru_linear_heap_size, NULL, 0);
-	GX_ProcessCommandList(commandBuffer, commandBuffer_size * 4, GX_CMDLIST_FLUSH);
-	
-	pgl_state.batched_draws = 0;
+	GX_FlushCacheRegions ((u32 *)__ctru_linear_heap, __ctru_linear_heap_size, (u32 *)NULL, 0, NULL, 0);
 
-	GPUCMD_SetBuffer(pgl_state.command_buffer[next_buffer], pgl_state.command_buffer_length, 0);
+	if(swap_list)
+	{
+		pgl_queue_wait(true);
+		
+		GPUCMD_SetBuffer(pgl_state.command_buffer[next_buffer], pgl_state.command_buffer_length, 0);
 
-	next_buffer = !next_buffer;
+		next_buffer = !next_buffer;
+
+		pgl_state.batched_draws = 0;
+	}
+
+	GX_ProcessCommandList(command_buffer, command_buffer_size * 4, 0);
+}
+
+void glFlush(void)
+{
+	pgl_queue_commands(false);
 }
 
 void glFinish(void)
 {
-	glFlush();
+	pgl_queue_commands(true);
 	pgl_queue_wait(true);
 }
 
@@ -71,7 +77,7 @@ void pglSwapBuffersEx(unsigned top, unsigned bot)
 	uint32_t *output_framebuffer;
 	uint32_t  transfer_flags, dimension;
 
-	glFlush();
+	pgl_queue_commands(true);
 
 	if(top)
 	{
@@ -106,9 +112,6 @@ void pglSwapBuffersEx(unsigned top, unsigned bot)
 	}
 
 	gxCmdQueueSetCallback(&pgl_state.gx_queue, queue_finish_callback, NULL);
-
-	pgl_state.batched_draws = 0;
-	pgl_state.current_mode = 0;
 }
 
 void pglSwapBuffers()

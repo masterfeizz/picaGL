@@ -1,6 +1,61 @@
 #ifndef __PICA_H__
 #define __PICA_H__
 
+#include "types.h"
+
+static inline void pica_rendertarget_set(pgl_rendertarget_t *target)
+{
+	static const uint8_t color_format_sizes[] = {2,1,0,0,0};
+
+	u32 param[4] = { 0, 0, 0, 0 };
+
+	GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_FLUSH, 1);
+
+	GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_INVALIDATE, 1);
+
+	param[0] = osConvertVirtToPhys(target->depth_buffer) >> 3;
+	param[1] = osConvertVirtToPhys(target->color_buffer) >> 3;
+	param[2] = 0x01000000 | (((u32)(target->width-1) & 0xFFF) << 12) | (target->height & 0xFFF);
+	GPUCMD_AddIncrementalWrites(GPUREG_DEPTHBUFFER_LOC, param, 3);
+
+	GPUCMD_AddWrite(GPUREG_RENDERBUF_DIM,       param[2]);
+	GPUCMD_AddWrite(GPUREG_DEPTHBUFFER_FORMAT,  target->depth_format);
+	GPUCMD_AddWrite(GPUREG_COLORBUFFER_FORMAT,  color_format_sizes[target->color_format] | ((u32)target->color_format << 16));
+	GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_BLOCK32, 0);
+
+	// Enable or disable color/depth buffers
+	param[0] = param[1] = target->color_buffer ? 0xF : 0;
+	param[2] = param[3] = target->depth_buffer ? 0x2 : 0;
+	GPUCMD_AddIncrementalWrites(GPUREG_COLORBUFFER_READ, param, 4);
+}
+
+static inline void pica_texture_set(GPU_TEXUNIT unit, pgl_texture_t* texture)
+{
+	uint32_t addr = osConvertVirtToPhys(texture->data);
+
+	switch (unit)
+	{
+	case GPU_TEXUNIT0:
+		GPUCMD_AddWrite(GPUREG_TEXUNIT0_TYPE, texture->format);
+		GPUCMD_AddWrite(GPUREG_TEXUNIT0_ADDR1, addr >> 3);
+		GPUCMD_AddWrite(GPUREG_TEXUNIT0_DIM, texture->dim);
+		GPUCMD_AddWrite(GPUREG_TEXUNIT0_PARAM, texture->param);
+		GPUCMD_AddWrite(GPUREG_TEXUNIT0_LOD, texture->lod_param);
+		break;
+
+	case GPU_TEXUNIT1:
+		GPUCMD_AddWrite(GPUREG_TEXUNIT1_TYPE, texture->format);
+		GPUCMD_AddWrite(GPUREG_TEXUNIT1_ADDR, addr >> 3);
+		GPUCMD_AddWrite(GPUREG_TEXUNIT1_DIM, texture->dim);
+		GPUCMD_AddWrite(GPUREG_TEXUNIT1_PARAM, texture->param);
+		GPUCMD_AddWrite(GPUREG_TEXUNIT1_LOD, texture->lod_param);
+		break;
+
+	default:
+		break;
+	}
+}
+
 static inline void pica_viewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
 {
 	u32 param[4];

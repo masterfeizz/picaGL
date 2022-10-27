@@ -22,7 +22,7 @@ void glGetIntegerv(GLenum pname, GLint *params)
 	switch(pname) 
 	{
 		case GL_MAX_TEXTURE_SIZE:
-			*params = 128; break;
+			*params = 256; break;
 		case GL_MAX_TEXTURE_UNITS_ARB:
 			*params = 2; break;
 	}
