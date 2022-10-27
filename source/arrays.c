@@ -214,7 +214,7 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 	if(pgl_check_cache_limit(cached_vertex_size) == false)
 	{
-		glFlush();	
+		pgl_queue_commands(true);	
 		pgl_state.vertex_cache_pos = 0;
 	}
 
@@ -290,7 +290,7 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 	}
 
 	if(++pgl_state.batched_draws > MAX_BATCHED_DRAWS)
-		glFlush();
+		pgl_queue_commands(true);
 
 	pgl_state.current_mode = PGL_ARRAYS;
 }
@@ -311,7 +311,7 @@ void glLockArrays (GLint first, GLsizei count)
 
 	if(pgl_check_cache_limit(cached_vertex_size) == false)
 	{
-		glFlush();	
+		pgl_queue_commands(true);	
 		pgl_state.vertex_cache_pos = 0;
 	}
 

@@ -287,3 +287,4 @@ void pgl_state_default();
 // queue.c
 void pgl_queue_init(void);
 void pgl_queue_wait(bool clear);
+void pgl_queue_commands(bool swap_list);

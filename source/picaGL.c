@@ -66,6 +66,8 @@ void pglExit()
 
 void pglSelectScreen(unsigned display, unsigned side)
 {
+	pgl_queue_commands(false);
+	
 	if(display == GFX_BOTTOM) 
 		pgl_state.render_target_active = &pgl_state.render_target[0];
 	else 

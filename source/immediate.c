@@ -162,7 +162,7 @@ void glEnd(void)
 	pica_draw_arrays(primitive_type, 0, vertex_count);
 	
 	if(++pgl_state.batched_draws > MAX_BATCHED_DRAWS)
-		glFlush();
+		pgl_queue_commands(true);
 }
 
 void glMultiTexCoord2f( GLenum target, GLfloat s, GLfloat t )
