@@ -9,8 +9,6 @@ static inline void pica_rendertarget_set(pgl_rendertarget_t *target)
 
 	u32 param[4] = { 0, 0, 0, 0 };
 
-	GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_FLUSH, 1);
-
 	GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_INVALIDATE, 1);
 
 	param[0] = osConvertVirtToPhys(target->depth_buffer) >> 3;

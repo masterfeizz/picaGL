@@ -76,6 +76,8 @@ void pgl_state_initialize(size_t command_buffer_length, size_t vertex_cache_size
 
 	GX_MemoryFill( 	pgl_state.render_target[0].color_buffer, 0, (uint32_t*)buffer_end[0], BIT(0) | (render_target_bpp[pgl_state.render_target[0].color_format] << 8),
 					pgl_state.render_target[1].color_buffer, 0, (uint32_t*)buffer_end[1], BIT(0) | (render_target_bpp[pgl_state.render_target[1].color_format] << 8) );
+
+	pica_rendertarget_set(pgl_state.render_target_active);
 }
 
 void pgl_state_default()
@@ -133,11 +135,6 @@ void pgl_state_flush()
 {
 	if(!pgl_state.changes)
 		return;
-	
-	if(pgl_state.changes & pgl_change_rendertarget)
-	{
-		pica_rendertarget_set(pgl_state.render_target_active);
-	}
 
 	if(pgl_state.changes & pgl_change_viewport)
 	{

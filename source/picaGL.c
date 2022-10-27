@@ -20,6 +20,7 @@ static void apt_hook_callback(APT_HookType type, void* param)
 		}
 		case APTHOOK_ONRESTORE:
 		{
+			pica_rendertarget_set(pgl_state.render_target_active);
 			pica_attribbuffers_location((void*)__ctru_linear_heap);
 
 			GPUCMD_AddIncrementalWrites(GPUREG_TEXENV2_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
@@ -73,5 +74,5 @@ void pglSelectScreen(unsigned display, unsigned side)
 	else 
 		pgl_state.render_target_active = &pgl_state.render_target[1];
 
-	pgl_state.changes |= pgl_change_rendertarget;
+	pica_rendertarget_set(pgl_state.render_target_active);
 }

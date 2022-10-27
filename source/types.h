@@ -21,12 +21,11 @@ typedef enum {
 	pgl_change_scissor      = BIT(6),
 	pgl_change_texture      = BIT(7),
 	pgl_change_texenv       = BIT(8),
-	pgl_change_rendertarget = BIT(9),
-	pgl_change_fog          = BIT(10),
-	pgl_change_matrix       = BIT(11),
+	pgl_change_fog          = BIT(9),
+	pgl_change_matrix       = BIT(10),
 
-	pgl_change_modelview    = BIT(11),
-	pgl_change_projection   = BIT(12),
+	pgl_change_modelview    = BIT(10),
+	pgl_change_projection   = BIT(11),
 
 	pgl_change_any = 0xFFFF,
 

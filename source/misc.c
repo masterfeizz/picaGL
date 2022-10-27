@@ -2,8 +2,6 @@
 
 extern mat4f pgl_matrix_identity;
 
-extern void pica_rendertarget_set(pgl_rendertarget_t *target);
-
 void glClear(GLbitfield mask)
 {
 	uint32_t write_mask = 0;
@@ -12,9 +10,9 @@ void glClear(GLbitfield mask)
 		write_mask |= pgl_state.depth_test.write_mask & 0x0F;
 	if(mask & GL_DEPTH_BUFFER_BIT)
 		write_mask |= pgl_state.depth_test.write_mask & 0x10;
-
-	pica_rendertarget_set(pgl_state.render_target_active);
 	
+	GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_FLUSH, 1);
+
 	pica_viewport(0, 0, 240, pgl_state.render_target_active->width); 
 	
 	pica_scissor_test(pgl_state.scissor.enabled ? 0x3 : 0x0, pgl_state.scissor.y, pgl_state.scissor.x, pgl_state.scissor.y + pgl_state.scissor.height, pgl_state.scissor.x + pgl_state.scissor.width);
