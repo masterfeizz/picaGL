@@ -116,7 +116,7 @@ static inline void pica_depthmap(float near, float far, float polygon_offset){
 	GPUCMD_AddWrite(GPUREG_DEPTHMAP_OFFSET, f32tof24(offset));
 }
 
-static inline void _picaEarlyDepthTest(bool enabled)
+static inline void pica_early_depth_test(bool enabled)
 {
 	GPUCMD_AddWrite(GPUREG_EARLYDEPTH_TEST1, enabled);
 	GPUCMD_AddWrite(GPUREG_EARLYDEPTH_TEST2, enabled);
@@ -125,7 +125,19 @@ static inline void _picaEarlyDepthTest(bool enabled)
 static inline void pica_uniform_float(uint32_t startreg, float *data, uint32_t numreg)
 {
 	GPUCMD_AddWrite (GPUREG_VSH_FLOATUNIFORM_CONFIG, 0x80000000 | startreg);
-	GPUCMD_AddWrites(GPUREG_VSH_FLOATUNIFORM_DATA, (u32*)data, numreg * 4);
+	GPUCMD_AddWrites(GPUREG_VSH_FLOATUNIFORM_DATA, (u32*)data, numreg);
+}
+
+static inline void pica_uniform_matf(uint32_t startreg, float *data)
+{
+	GPUCMD_AddWrite (GPUREG_VSH_FLOATUNIFORM_CONFIG, 0x80000000 | startreg);
+	GPUCMD_AddWrites(GPUREG_VSH_FLOATUNIFORM_DATA, (u32*)data, 16);
+}
+
+static inline void pica_uniforms_bool(uint16_t data)
+{
+
+	GPUCMD_AddWrite(GPUREG_VSH_BOOLUNIFORM, 0x7FFF0000 | data);
 }
 
 static inline void pica_depth_color_mask(bool enable, GPU_TESTFUNC function, GPU_WRITEMASK writemask)

@@ -240,6 +240,15 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 	buffer_count -= 1;
 
+	//Float colors?
+	if(pgl_state.vertex_attrib[1].enabled)
+	{
+		if(pgl_state.vertex_attrib[1].type == GPU_FLOAT)
+			pica_uniforms_bool(0x0000);
+		else
+			pica_uniforms_bool(0x0001);
+	}
+	
 	if(pgl_state.current_mode != PGL_ARRAYS)
 	{
 		//GPUCMD_AddWrite(GPUREG_FIXEDATTRIB_INDEX, 1);
@@ -319,3 +328,4 @@ void glLockArrays (GLint first, GLsizei count)
 }
 
 void glLockArraysEXT (GLint first, GLsizei count){};
+void glUnlockArraysEXT (void){};

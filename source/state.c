@@ -119,7 +119,7 @@ void pgl_state_default()
 
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
-	_picaEarlyDepthTest(false);
+	pica_early_depth_test(false);
 
 	GPUCMD_AddIncrementalWrites(GPUREG_TEXENV2_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
 	GPUCMD_AddIncrementalWrites(GPUREG_TEXENV3_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
@@ -279,9 +279,9 @@ void pgl_state_flush()
 	}
 
 	if(pgl_state.changes & pgl_change_modelview)
-		pica_uniform_float(4, (float*)&pgl_state.matrix_stack[0][ pgl_state.matrix_stack_index[0] ], 4);
+		pica_uniform_matf(4, (float*)&pgl_state.matrix_stack[0][ pgl_state.matrix_stack_index[0] ]);
 	if(pgl_state.changes & pgl_change_projection)
-		pica_uniform_float(0, (float*)&pgl_state.matrix_stack[1][ pgl_state.matrix_stack_index[1] ], 4);
+		pica_uniform_matf(0, (float*)&pgl_state.matrix_stack[1][ pgl_state.matrix_stack_index[1] ]);
 
 	pgl_state.changes = 0;
 }

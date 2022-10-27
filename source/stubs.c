@@ -281,5 +281,3 @@ typedef int GLintptrARB;
 typedef int GLsizeiptrARB;
 void glBufferDataARB (GLenum target, GLsizeiptrARB size, const GLvoid *data, GLenum usage) {}
 void glBufferSubDataARB (GLenum target, GLintptrARB offset, GLsizeiptrARB size, const GLvoid *data) {}
-
-void glUnlockArraysEXT (void) {}

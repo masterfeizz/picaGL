@@ -19,8 +19,8 @@ void glClear(GLbitfield mask)
 	
 	pica_scissor_test(pgl_state.scissor.enabled ? 0x3 : 0x0, pgl_state.scissor.y, pgl_state.scissor.x, pgl_state.scissor.y + pgl_state.scissor.height, pgl_state.scissor.x + pgl_state.scissor.width);
 
-	pica_uniform_float(0, (float*)&pgl_matrix_identity, 4);
-	pica_uniform_float(4, (float*)&pgl_matrix_identity, 4);
+	pica_uniform_matf(0, (float*)&pgl_matrix_identity);
+	pica_uniform_matf(4, (float*)&pgl_matrix_identity);
 
 	pica_depthmap(0, 1.0, 0);
 	pica_logic_op(GPU_LOGICOP_COPY);

@@ -53,6 +53,8 @@ void glBegin(GLenum mode)
 		GPUCMD_AddWrite(GPUREG_ATTRIBBUFFER2_CONFIG2, 0);
 		GPUCMD_AddWrite(GPUREG_ATTRIBBUFFER3_CONFIG2, 0);
 
+		pica_uniforms_bool(0x0000);
+
 		pgl_state.current_mode = PGL_IMMEDIATE;
 	}
 

@@ -2,6 +2,7 @@
 
 ; Uniforms
 .fvec projection[4], modelView[4]
+.bool byteColor
 
 ; Constants
 .constf myconst(0.0, 1.0, -1.0, 0.00392156862)
@@ -40,10 +41,8 @@
 
 	mov outtc0, intex
 	mov outtc1, intex2
-	
-	cmp inclr.w, gt, gt, r0.w
 
-	ifc cmp.x
+	ifu byteColor
 		mul outclr, rgba8_to_float, inclr
 	.else
 		mov outclr, inclr
