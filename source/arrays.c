@@ -214,7 +214,7 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 
 	if(pgl_check_cache_limit(cached_vertex_size) == false)
 	{
-		pgl_queue_commands(true);	
+		pgl_queue_commands(false);	
 		pgl_state.vertex_cache_pos = 0;
 	}
 
@@ -311,7 +311,7 @@ void glLockArrays (GLint first, GLsizei count)
 
 	if(pgl_check_cache_limit(cached_vertex_size) == false)
 	{
-		pgl_queue_commands(true);	
+		pgl_queue_commands(false);	
 		pgl_state.vertex_cache_pos = 0;
 	}
 
