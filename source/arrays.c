@@ -19,13 +19,21 @@ static bool pgl_check_cache_limit(size_t size)
 
 static void* pgl_cache_data(const void *data, size_t size)
 {
-	void *cache = pgl_state.vertex_cache + pgl_state.vertex_cache_pos;
+	void *cache_ptr;
 
-	if(data != NULL) memcpy(cache, data, size);
+	if(pgl_check_cache_limit(size) == false)
+	{
+		pgl_queue_commands(false);	
+		pgl_state.vertex_cache_pos = 0;
+	}
+
+	cache_ptr = pgl_state.vertex_cache + pgl_state.vertex_cache_pos;
+
+	if(data != NULL) memcpy(cache_ptr, data, size);
 
 	pgl_state.vertex_cache_pos += (size + 3) & ~3;
 
-	return cache;
+	return cache_ptr;
 }
 
 static uint64_t pgl_config_attr_buffer(uint64_t format, uint8_t stride, uint8_t count, uint32_t padding)
@@ -198,26 +206,6 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 	if(type != GL_UNSIGNED_SHORT || pgl_state.vertex_attrib[0].enabled == GL_FALSE)
 		return;
 
-	size_t cached_vertex_size = 0;
-
-	for(int i = 0; i < 4; i++)
-	{
-		if(pgl_state.vertex_attrib[i].enabled == false)
-			continue;
-
-		if(pgl_state.vertex_attrib[i].cached_len < end)
-			cached_vertex_size += pgl_state.vertex_attrib[i].stride * end;
-	}
-
-	if(indices)
-		cached_vertex_size += count * sizeof(GLushort);
-
-	if(pgl_check_cache_limit(cached_vertex_size) == false)
-	{
-		pgl_queue_commands(false);	
-		pgl_state.vertex_cache_pos = 0;
-	}
-
 	pgl_state_flush();
 	
 	uint8_t buffer_count = 0;
@@ -298,22 +286,6 @@ void glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, 
 void glLockArrays (GLint first, GLsizei count)
 {
 	int end = first + count;
-
-	size_t cached_vertex_size = 0;
-
-	for(int i = 0; i < 4; i++)
-	{
-		if(pgl_state.vertex_attrib[i].enabled == false)
-			continue;
-
-		cached_vertex_size += pgl_state.vertex_attrib[i].stride * end;
-	}
-
-	if(pgl_check_cache_limit(cached_vertex_size) == false)
-	{
-		pgl_queue_commands(false);	
-		pgl_state.vertex_cache_pos = 0;
-	}
 
 	for(int i = 0; i < 4; i++)
 	{
