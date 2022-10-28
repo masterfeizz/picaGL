@@ -1,18 +1,25 @@
 #include "internal.h"
 
-static bool swap_top, swap_bottom;
+static LightEvent swap_done;
+static bool       swap_top, swap_bottom;
 
-static void queue_finish_callback(gxCmdQueue_s* queue)
+static void display_transfer_callback(void *arg)
 {
-	if (swap_top)
+	if (swap_top) 
+	{
+		swap_top = false;
 		gfxScreenSwapBuffers(GFX_TOP, false);
-	
-	if (swap_bottom)
+	}
+	else if (swap_bottom)
+	{
+		swap_bottom = false;
 		gfxScreenSwapBuffers(GFX_BOTTOM, false);
+	}
 
-	swap_top = swap_bottom = false;
-
-	gxCmdQueueSetCallback(queue, NULL, NULL);
+	if (swap_bottom == false && swap_top == false)
+	{
+		LightEvent_Signal(&swap_done);
+	}
 }
 
 void pgl_queue_init(void)
@@ -21,6 +28,11 @@ void pgl_queue_init(void)
 
 	GX_BindQueue( &pgl_state.gx_queue);
 	gxCmdQueueRun(&pgl_state.gx_queue);
+
+	gspSetEventCallback(GSPGPU_EVENT_PPF, display_transfer_callback, NULL, false); 
+
+	LightEvent_Init(&swap_done, RESET_ONESHOT);
+	LightEvent_Signal(&swap_done);
 }
 
 void pgl_queue_wait(bool clear)
@@ -79,6 +91,8 @@ void pglSwapBuffersEx(unsigned top, unsigned bot)
 
 	pgl_queue_commands(true);
 
+	LightEvent_Wait(&swap_done);
+
 	if(top)
 	{
 		output_framebuffer = (uint32_t*)gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
@@ -110,8 +124,6 @@ void pglSwapBuffersEx(unsigned top, unsigned bot)
 
 		swap_bottom = true;
 	}
-
-	gxCmdQueueSetCallback(&pgl_state.gx_queue, queue_finish_callback, NULL);
 }
 
 void pglSwapBuffers()
