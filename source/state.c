@@ -88,7 +88,7 @@ void pgl_state_default()
 	pgl_state.texenv[PGL_TEXENV_UNTEXTURED].src_rgb   = GPU_TEVSOURCES(GPU_PRIMARY_COLOR, GPU_PRIMARY_COLOR, GPU_PRIMARY_COLOR);
 	pgl_state.texenv[PGL_TEXENV_UNTEXTURED].src_alpha = pgl_state.texenv[PGL_TEXENV_UNTEXTURED].src_rgb;
 
-	pgl_state.depthmap.near 	= 1.0f;
+	pgl_state.depthmap.near = 1.0f;
 	pgl_state.depthmap.far 	= 0.0f;
 	pgl_state.depthmap.offset = 0.0f;
 

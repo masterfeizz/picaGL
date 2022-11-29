@@ -28,8 +28,14 @@ static void pgl_generate_lut()
 		{
 			val = expf(-pgl_state.fog.density * x);
 		}
+		else if(pgl_state.fog.mode == GL_EXP2)
+		{
+			val = expf(-powf(pgl_state.fog.density * x, 2.0f));
+		}
 		else
+		{
 			val = -1.0f;
+		}
 
 		if (i < 128)
 			data[i] = val;
