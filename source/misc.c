@@ -20,6 +20,8 @@ void glClear(GLbitfield mask)
 	pica_uniform_matf(0, (float*)&pgl_matrix_identity);
 	pica_uniform_matf(4, (float*)&pgl_matrix_identity);
 
+	pica_uniforms_bool(0x0000); //Colors are floats
+
 	pica_depthmap(0, 1.0, 0);
 	pica_logic_op(GPU_LOGICOP_COPY);
 	GPUCMD_AddWrite(GPUREG_FRAGOP_ALPHA_TEST, 0);
