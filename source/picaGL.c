@@ -20,17 +20,7 @@ static void apt_hook_callback(APT_HookType type, void* param)
 		}
 		case APTHOOK_ONRESTORE:
 		{
-			pica_rendertarget_set(pgl_state.render_target_active);
-			pica_attribbuffers_location((void*)__ctru_linear_heap);
-
-			GPUCMD_AddIncrementalWrites(GPUREG_TEXENV2_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
-			GPUCMD_AddIncrementalWrites(GPUREG_TEXENV3_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
-			GPUCMD_AddIncrementalWrites(GPUREG_TEXENV4_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
-			GPUCMD_AddIncrementalWrites(GPUREG_TEXENV5_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
-
-			shaderProgramUse(&pgl_state.default_shader_program);
-
-			pgl_state.changes = pgl_change_any;
+			pglRestoreContext();
 
 			break;
 		}
@@ -63,6 +53,24 @@ void pglExit()
 	pgl_queue_wait(true);
 	GX_BindQueue(NULL);
 	//TODO: Clear memory
+}
+
+void pglRestoreContext()
+{
+	if(!pgl_initialized)
+		return;
+
+	pica_rendertarget_set(pgl_state.render_target_active);
+	pica_attribbuffers_location((void*)__ctru_linear_heap);
+
+	GPUCMD_AddIncrementalWrites(GPUREG_TEXENV2_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
+	GPUCMD_AddIncrementalWrites(GPUREG_TEXENV3_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
+	GPUCMD_AddIncrementalWrites(GPUREG_TEXENV4_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
+	GPUCMD_AddIncrementalWrites(GPUREG_TEXENV5_SOURCE, (uint32_t*)&pgl_state.texenv[PGL_TEXENV_DUMMY], 5);
+
+	shaderProgramUse(&pgl_state.default_shader_program);
+
+	pgl_state.changes = pgl_change_any;
 }
 
 void pglSelectScreen(unsigned display, unsigned side)
