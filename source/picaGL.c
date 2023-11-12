@@ -4,7 +4,7 @@
 #define COMMAND_BUFFER_LENGTH 0x060000
 #define VERTEX_BUFFER_SIZE    0x080000
 
-static int pgl_initialized = 0;
+static bool pgl_initialized = false;
 static aptHookCookie hook_cookie;
 
 static void apt_hook_callback(APT_HookType type, void* param)
@@ -39,6 +39,8 @@ void pglInitEx(size_t command_buffer_length, size_t vertex_cache_size)
 	pgl_state_default();
 
 	aptHook(&hook_cookie, apt_hook_callback, NULL);
+
+	pgl_initialized = true;
 }
 
 void pglInit()
@@ -70,6 +72,7 @@ void pglRestoreContext()
 
 	shaderProgramUse(&pgl_state.default_shader_program);
 
+	pgl_state.current_mode = -1;
 	pgl_state.changes = pgl_change_any;
 }
 
