@@ -1,14 +1,15 @@
 #include "internal.h"
 
 static LightEvent swap_done;
-static bool       swap_top, swap_bottom;
+static int        swap_top;      // top screen transfers still running (2 in stereo)
+static bool       swap_top_stereo, swap_bottom;
 
 static void display_transfer_callback(void *arg)
 {
 	if (swap_top) 
 	{
-		swap_top = false;
-		gfxScreenSwapBuffers(GFX_TOP, false);
+		if (--swap_top == 0)
+			gfxScreenSwapBuffers(GFX_TOP, swap_top_stereo);
 	}
 	else if (swap_bottom)
 	{
@@ -16,7 +17,7 @@ static void display_transfer_callback(void *arg)
 		gfxScreenSwapBuffers(GFX_BOTTOM, false);
 	}
 
-	if (swap_bottom == false && swap_top == false)
+	if (swap_bottom == false && swap_top == 0)
 	{
 		LightEvent_Signal(&swap_done);
 	}
@@ -24,7 +25,8 @@ static void display_transfer_callback(void *arg)
 
 void pgl_queue_init(void)
 {
-	swap_top = swap_bottom = false;
+	swap_top = 0;
+	swap_top_stereo = swap_bottom = false;
 
 	GX_BindQueue( &pgl_state.gx_queue);
 	gxCmdQueueRun(&pgl_state.gx_queue);
@@ -95,18 +97,34 @@ void pglSwapBuffersEx(unsigned top, unsigned bot)
 
 	if(top)
 	{
-		output_framebuffer = (uint32_t*)gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
-		dimension = GX_BUFFER_DIM(pgl_state.render_target[1].height, pgl_state.render_target[1].width);
+		bool stereo = pgl_state.stereo_enabled;
+		int  eye, eyes = stereo ? 2 : 1;
+
+		// mode changes take effect with this swap; wide and 3D are mutually exclusive
+		// (one top mode in libctru: gfxSet3D(false) would also turn wide mode off)
+		if(stereo)
+			gfxSet3D(true);
+		else
+			gfxSetWide(pgl_state.top_wide);
 
 		transfer_flags  = GX_TRANSFER_IN_FORMAT(transfer_in_format[pgl_state.render_target[1].color_format]);
 		transfer_flags |= GX_TRANSFER_OUT_FORMAT(gfxGetScreenFormat(GFX_TOP));
-		
-		GX_DisplayTransfer(
-			(u32*)pgl_state.render_target[1].color_buffer, dimension,
-			output_framebuffer, dimension,
-			transfer_flags);
 
-		swap_top = true;
+		swap_top = eyes;
+		swap_top_stereo = stereo;
+
+		for(eye = 0; eye < eyes; eye++)
+		{
+			pgl_rendertarget_t *rt = &pgl_state.render_target[eye ? 2 : 1];
+
+			output_framebuffer = (uint32_t*)gfxGetFramebuffer(GFX_TOP, eye ? GFX_RIGHT : GFX_LEFT, NULL, NULL);
+			dimension = GX_BUFFER_DIM(rt->height, rt->width);
+
+			GX_DisplayTransfer(
+				(u32*)rt->color_buffer, dimension,
+				output_framebuffer, dimension,
+				transfer_flags);
+		}
 	}
 
 	if(bot)

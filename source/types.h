@@ -215,8 +215,12 @@ typedef struct {
 
 	gxCmdQueue_s         gx_queue;
 
-	pgl_rendertarget_t   render_target[2];
+	pgl_rendertarget_t   render_target[3];   // bottom, top (left eye), top right eye
 	pgl_rendertarget_t  *render_target_active;
+
+	bool                 top_wide;           // top screen was set up in 800px wide mode
+	bool                 stereo_enabled;     // see pglStereoEnable
+	unsigned             stereo_target;
 
 	pgl_alpha_blend_t    blend;
 	pgl_depthmap_t       depthmap;

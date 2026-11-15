@@ -53,6 +53,13 @@ void pgl_state_initialize(size_t command_buffer_length, size_t vertex_cache_size
 	pgl_state.render_target[1].width = width; pgl_state.render_target[1].height = 240;
 	pgl_state.render_target[1].depth_format = GPU_RB_DEPTH16;
 
+	//Top Screen, right eye (stereoscopic 3D): buffers allocated on first use, see pglStereoEnable
+	pgl_state.top_wide = (width == 800);
+	pgl_state.render_target[2] = pgl_state.render_target[1];
+	pgl_state.render_target[2].width = 400;
+	pgl_state.render_target[2].color_buffer = NULL;
+	pgl_state.render_target[2].depth_buffer = NULL;
+
 	if(pgl_state.render_target[1].color_format > GPU_RB_RGB8)
 		pgl_state.downsample_textures = true;
 
