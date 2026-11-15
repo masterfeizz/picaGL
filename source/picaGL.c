@@ -82,8 +82,78 @@ void pglSelectScreen(unsigned display, unsigned side)
 	
 	if(display == GFX_BOTTOM) 
 		pgl_state.render_target_active = &pgl_state.render_target[0];
-	else 
+	else if(pgl_state.stereo_enabled && pgl_state.stereo_target == PGL_STEREO_RIGHT)
+		pgl_state.render_target_active = &pgl_state.render_target[2];
+	else
 		pgl_state.render_target_active = &pgl_state.render_target[1];
 
 	pica_rendertarget_set(pgl_state.render_target_active);
+}
+
+int pglStereoEnable(int enable)
+{
+	pgl_rendertarget_t *top = &pgl_state.render_target[1], *right = &pgl_state.render_target[2];
+
+	enable = enable ? 1 : 0;
+
+	if(enable == pgl_state.stereo_enabled)
+		return 1;
+
+	if(enable && !right->color_buffer)
+	{
+		size_t bpp = top->color_format == GPU_RB_RGBA8 ? 4 : (top->color_format == GPU_RB_RGB8 ? 3 : 2);
+
+		right->color_buffer = vramAlloc(400 * 240 * bpp);
+		right->depth_buffer = vramAlloc(400 * 240 * 2);
+
+		// render targets work in FCRAM too, a bit slower
+		if(!right->color_buffer)
+			right->color_buffer = linearAlloc(400 * 240 * bpp);
+		if(!right->depth_buffer)
+			right->depth_buffer = linearAlloc(400 * 240 * 2);
+
+		if(!right->color_buffer || !right->depth_buffer)
+			return 0;
+	}
+
+	GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_FLUSH, 1);
+
+	pgl_state.stereo_enabled = enable;
+	pgl_state.stereo_target  = PGL_STEREO_LEFT;
+
+	// the left eye is the first 400 columns of the top target
+	top->width = (!enable && pgl_state.top_wide) ? 800 : 400;
+
+	if(pgl_state.render_target_active != &pgl_state.render_target[0])
+	{
+		pgl_state.render_target_active = top;
+		pica_rendertarget_set(top);
+	}
+
+	pgl_state.changes |= pgl_change_viewport | pgl_change_scissor;
+
+	return 1;
+}
+
+void pglStereoTarget(unsigned target)
+{
+	pgl_rendertarget_t *rt;
+
+	if(!pgl_state.stereo_enabled)
+		target = PGL_STEREO_LEFT;
+
+	pgl_state.stereo_target = target;
+
+	if(pgl_state.render_target_active == &pgl_state.render_target[0])
+		return;
+
+	rt = &pgl_state.render_target[target == PGL_STEREO_RIGHT ? 2 : 1];
+
+	if(rt == pgl_state.render_target_active)
+		return;
+
+	GPUCMD_AddWrite(GPUREG_FRAMEBUFFER_FLUSH, 1);
+
+	pgl_state.render_target_active = rt;
+	pica_rendertarget_set(rt);
 }

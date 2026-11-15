@@ -139,10 +139,12 @@ void glFrustum(GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLd
 
 	memset(matrix, 0, sizeof(mat4f));
 
+	// The 3DS screen is rotated: output row 0 is the vertical axis (from y), row 1 the
+	// negated horizontal axis (from x), so each off-center term goes with its own axis.
 	matrix->row[0].y = 2 * near / (top - bottom);
-	matrix->row[0].z = (right + left) / (right - left);
+	matrix->row[0].z = (top + bottom) / (top - bottom);
 	matrix->row[1].x = -2 * near / (right - left);
-	matrix->row[1].z = (top + bottom) / (top - bottom);
+	matrix->row[1].z = -(right + left) / (right - left);
 	matrix->row[2].z = (far + near) / (far - near);
 	matrix->row[2].w = (2 * far * near) / (far - near);
 	matrix->row[3].z = -1.0f;
